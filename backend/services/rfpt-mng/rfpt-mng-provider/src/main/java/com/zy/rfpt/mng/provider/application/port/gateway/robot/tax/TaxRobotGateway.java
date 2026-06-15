@@ -8,7 +8,8 @@ public interface TaxRobotGateway {
     /**
      * 触发社保缴费任务执行。
      *
-     * @param taskId 任务编号
+     * @param taxNo 纳税人识别号
+     * @param siteType 站点类型
      */
-    void triggerSocialSecurityPayment(Long taskId);
+    void triggerSocialSecurityPayment(String taxNo, String siteType);
 }

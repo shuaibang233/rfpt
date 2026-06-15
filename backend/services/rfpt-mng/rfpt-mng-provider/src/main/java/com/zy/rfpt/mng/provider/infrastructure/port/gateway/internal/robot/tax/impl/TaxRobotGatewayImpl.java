@@ -31,15 +31,15 @@ public class TaxRobotGatewayImpl implements TaxRobotGateway {
     private TaxRobotProperties properties;
 
     @Override
-    public void triggerSocialSecurityPayment(Long taskId) {
+    public void triggerSocialSecurityPayment(String taxNo, String siteType) {
         if (StringUtils.isBlank(properties.getBaseUrl())) {
-            log.warn("税务机器人地址为空，跳过触发，taskId={}", taskId);
+            log.warn("税务机器人地址为空，跳过触发，taxNo={}", taxNo);
             return;
         }
         OkHttpClient client = new OkHttpClient.Builder()
                 .callTimeout(Duration.ofMillis(properties.getTimeoutMillis()))
                 .build();
-        String body = "{\"taskId\":" + taskId + "}";
+        String body = "{\"taxNo\":\"" + taxNo + "\",\"siteType\":\"" + StringUtils.defaultIfBlank(siteType, "default") + "\"}";
         Request.Builder builder = new Request.Builder()
                 .url(StringUtils.removeEnd(properties.getBaseUrl(), "/") + "/internal/tax/social-security-payment")
                 .post(RequestBody.create(body, JSON));

@@ -8,18 +8,16 @@
         <result property="enterpriseName" column="enterprise_name"/>
         <result property="securityAccountName" column="security_account_name"/>
         <result property="regionCode" column="region_code"/>
-        <result property="siteType" column="site_type"/>
-        <result property="periodMonth" column="period_month"/>
-        <result property="status" column="status"/>
-        <result property="payableAmount" column="payable_amount"/>
-        <result property="errorCode" column="error_code"/>
+        <result property="periodMonth" column="settle_month"/>
+        <result property="status" column="task_status"/>
+        <result property="payableAmount" column="tax_total_amount"/>
         <result property="errorMessage" column="error_message"/>
         <result property="retryable" column="retryable"/>
         <result property="retryCount" column="retry_count"/>
         <result property="maxRetryCount" column="max_retry_count"/>
         <result property="createdBy" column="created_by"/>
-        <result property="createdAt" column="created_at"/>
-        <result property="updatedAt" column="updated_at"/>
+        <result property="createdAt" column="gmt_create"/>
+        <result property="updatedAt" column="gmt_modified"/>
     </resultMap>
 
     <sql id="TaskWhere">
@@ -31,17 +29,17 @@
                 AND t.tax_no = #{query.taxNo}
             </if>
             <if test="query.status != null and query.status != ''">
-                AND t.status = #{query.status}
+                AND t.task_status = #{query.status}
             </if>
         </where>
     </sql>
 
     <insert id="batchInsert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO tb_tax_social_security_payment_task
-        (batch_id, tax_no, region_code, site_type, period_month, status, retryable, retry_count, max_retry_count, created_by, created_at, updated_at)
+        (batch_id, tax_no, region_code, settle_month, task_status, retryable, retry_count, max_retry_count, created_by, gmt_create, gmt_modified)
         VALUES
         <foreach collection="list" item="item" separator=",">
-            (#{item.batchId}, #{item.taxNo}, #{item.regionCode}, #{item.siteType}, #{item.periodMonth}, #{item.status}, #{item.retryable}, #{item.retryCount}, #{item.maxRetryCount}, #{item.createdBy}, #{item.createdAt}, #{item.updatedAt})
+            (#{item.batchId}, #{item.taxNo}, #{item.regionCode}, #{item.periodMonth}, #{item.status}, #{item.retryable}, #{item.retryCount}, #{item.maxRetryCount}, #{item.createdBy}, #{item.createdAt}, #{item.updatedAt})
         </foreach>
     </insert>
 
@@ -54,8 +52,8 @@
 
     <update id="markRetry">
         UPDATE tb_tax_social_security_payment_task
-        SET status = 'PENDING', retryable = 0, retry_count = retry_count + 1,
-            error_code = NULL, error_message = NULL, updated_at = NOW(), updated_by = #{operator}
+        SET task_status = 'PROCESSING', retryable = 0, retry_count = retry_count + 1,
+            error_message = NULL, gmt_modified = NOW(), updated_by = #{operator}
         WHERE id = #{id}
     </update>
 

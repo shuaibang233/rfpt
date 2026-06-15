@@ -24,13 +24,13 @@ public class SocialSecurityPaymentTaskEntity implements Serializable {
     private String securityAccountName;
     /** 地区编码。 */
     private String regionCode;
-    /** 站点类型。 */
+    /** 站点类型，管理端触发机器人时使用，不落任务表。 */
     private String siteType;
     /** 费款所属月份。 */
     private String periodMonth;
-    /** 任务状态。 */
+    /** 任务状态，对应 task_status。 */
     private String status;
-    /** 应缴总额。 */
+    /** 应缴总额，对应 tax_total_amount。 */
     private BigDecimal payableAmount;
     /** 失败编码。 */
     private String errorCode;

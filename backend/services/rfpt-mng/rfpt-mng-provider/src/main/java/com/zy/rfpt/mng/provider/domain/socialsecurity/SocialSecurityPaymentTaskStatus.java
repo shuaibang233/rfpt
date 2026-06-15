@@ -5,10 +5,8 @@ package com.zy.rfpt.mng.provider.domain.socialsecurity;
  */
 public enum SocialSecurityPaymentTaskStatus {
 
-    /** 待执行。 */
-    PENDING,
     /** 执行中。 */
-    RUNNING,
+    PROCESSING,
     /** 已成功。 */
     SUCCESS,
     /** 已失败。 */

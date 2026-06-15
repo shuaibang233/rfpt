@@ -1,5 +1,6 @@
 -- 社保缴费管理端第一阶段表结构。
 -- 数据库：rf_tax
+-- 依赖：请先执行 qy_robot/sql/014_add_tax_social_security_payment.sql。
 
 CREATE TABLE IF NOT EXISTS `tb_tax_social_security_payment_batch` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键编号',
@@ -21,12 +22,11 @@ CREATE TABLE IF NOT EXISTS `tb_tax_social_security_payment_batch` (
 
 ALTER TABLE `tb_tax_social_security_payment_task`
   ADD COLUMN `batch_id` bigint DEFAULT NULL COMMENT '管理端批次编号' AFTER `id`,
-  ADD COLUMN `period_month` varchar(7) DEFAULT NULL COMMENT '费款所属月份，yyyy-MM' AFTER `site_type`,
   ADD COLUMN `retryable` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否允许重试' AFTER `error_message`,
   ADD COLUMN `retry_count` int NOT NULL DEFAULT 0 COMMENT '重试次数' AFTER `retryable`,
   ADD COLUMN `max_retry_count` int NOT NULL DEFAULT 3 COMMENT '最大重试次数' AFTER `retry_count`,
   ADD COLUMN `created_by` varchar(64) DEFAULT NULL COMMENT '创建人' AFTER `max_retry_count`,
   ADD COLUMN `updated_by` varchar(64) DEFAULT NULL COMMENT '更新人' AFTER `created_by`;
 
-CREATE INDEX `idx_batch_status` ON `tb_tax_social_security_payment_task` (`batch_id`, `status`);
-CREATE INDEX `idx_tax_period` ON `tb_tax_social_security_payment_task` (`tax_no`, `period_month`);
+CREATE INDEX `idx_batch_status` ON `tb_tax_social_security_payment_task` (`batch_id`, `task_status`);
+CREATE INDEX `idx_tax_period` ON `tb_tax_social_security_payment_task` (`tax_no`, `settle_month`);

@@ -65,7 +65,7 @@ public class SocialSecurityPaymentManagerImpl implements SocialSecurityPaymentMa
 
         List<SocialSecurityPaymentTaskEntity> tasks = buildTasks(batch, command);
         taskPersistencePort.batchInsert(tasks);
-        triggerAfterCommit(tasks.stream().map(SocialSecurityPaymentTaskEntity::getId).toList());
+        triggerAfterCommit(tasks);
         return batch.getId();
     }
 
@@ -98,15 +98,15 @@ public class SocialSecurityPaymentManagerImpl implements SocialSecurityPaymentMa
             throw new BusinessException(ErrorCode.E999001, "当前任务不允许重试");
         }
         taskPersistencePort.markRetry(command.getTaskId(), command.getOperator());
-        triggerAfterCommit(List.of(command.getTaskId()));
+        triggerAfterCommit(List.of(task));
     }
 
-    private void triggerAfterCommit(List<Long> taskIds) {
+    private void triggerAfterCommit(List<SocialSecurityPaymentTaskEntity> tasks) {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                for (Long taskId : taskIds) {
-                    taxRobotGateway.triggerSocialSecurityPayment(taskId);
+                for (SocialSecurityPaymentTaskEntity task : tasks) {
+                    taxRobotGateway.triggerSocialSecurityPayment(task.getTaxNo(), task.getSiteType());
                 }
             }
         });
@@ -142,7 +142,7 @@ public class SocialSecurityPaymentManagerImpl implements SocialSecurityPaymentMa
             task.setRegionCode(batch.getRegionCode());
             task.setSiteType(batch.getSiteType());
             task.setPeriodMonth(batch.getPeriodMonth());
-            task.setStatus(SocialSecurityPaymentTaskStatus.PENDING.name());
+            task.setStatus(SocialSecurityPaymentTaskStatus.PROCESSING.name());
             task.setRetryable(Boolean.FALSE);
             task.setRetryCount(0);
             task.setMaxRetryCount(3);
