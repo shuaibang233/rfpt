@@ -3,7 +3,7 @@ plugins {
 }
 
 springBoot {
-    mainClass = "com.zy.rfpt.mng.provider.RfptMngApplication"
+    mainClass = "com.rfpt.mng.provider.RfptMngApplication"
 }
 
 tasks.jar {

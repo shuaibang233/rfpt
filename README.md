@@ -1,75 +1,83 @@
 # rfpt
 
-`rfpt` 是社保缴费业务的管理系统仓库，前后端放在同一个 Git 仓库中。
+`rfpt` 是人力业务相关系统仓库，当前包含社保缴费管理和员工绩效查看/确认反馈能力。仓库采用前后端同库管理，后端参考 `zy_qy` 的 DDD 分层规范，前端包含管理后台和公众号 H5。
 
-## 模块边界
+## 技术栈
 
-- `backend/services/rfpt-mng`：管理端后端，负责企业、地区配置、社保缴费批次、任务状态、失败原因和重试管理。
-- `frontend/rfpt-mng-node`：管理端前端，负责运营人员发起批次、查看进度和处理失败任务。
-- `qy_robot/tax-browser-worker`：浏览器自动化执行端，继续作为独立机器人项目存在，管理端通过内部接口调用它。
+- 后端：JDK 21、Spring Boot 3、Dubbo 3、Nacos 2、MySQL 8、Redis、XXL-JOB、Gradle 8.8。
+- 管理后台：React 18、Ant Design 5、Vite、TypeScript。
+- 员工端 H5：React 18、Ant Design Mobile 5、Vite、TypeScript。
+- 测试部署：Docker Compose。
+- 生产部署：K8s + 云效流水线。
 
-## 第一阶段范围
+## 目录结构
 
-第一阶段围绕“社保缴费”流程沉淀管理能力：
+```text
+backend/
+  common/                         后端公共能力
+  services/
+    rfpt-mng/                     管理端后端
+    rfpt-performance/             员工绩效后端
+  docs/backend-rules/             后端开发规范
+  k8s/prod/                       生产后端 K8s 配置
+frontend/
+  rfpt-mng-node/                  管理后台前端
+  rfpt-h5-node/                   员工端公众号 H5
+deploy/
+  test/                           测试环境 Docker Compose
+  prod/                           生产云效流水线说明
+```
 
-1. 维护需要缴费的企业和地区站点配置。
-2. 按地区和月份发起缴费批次。
-3. 为批次生成企业维度任务。
-4. 调用机器人执行电子税务局流程。
-5. 记录 WPM 明细校验、缴费、完税凭证开具/下载等过程数据。
-6. 支持失败任务查看原因和重试。
+## 业务模块
 
-## 本地开发
+- 社保缴费：企业和地区配置、缴费批次、企业维度任务、过程状态、失败原因和重试。
+- 员工绩效：管理员创建绩效任务、导入员工绩效、员工手机号验证登录、查看绩效、确认或反馈、自动确认、后台调整、反馈和调整留痕、查询与导出。
+
+## 开发规范入口
+
+执行具体开发前先读取根目录 `AGENTS.md`，再按任务范围读取：
+
+- 后端：`backend/docs/backend-rules/ASSISTANT.md`
+- 管理后台：`frontend/rfpt-mng-node/docs/frontend-rules/ASSISTANT.md`
+- H5：`frontend/rfpt-h5-node/docs/frontend-rules/ASSISTANT.md`
+
+核心约束摘要：
+
+- 后端采用 `api` / `provider` 双模块和 `interfaces`、`application`、`domain`、`infrastructure`、`common` 分层。
+- Controller、RemoteServiceImpl、Job 只做入口适配，业务编排放 Manager。
+- 单表持久化通过 PersistencePort 隔离。
+- Mapper XML 和注解 SQL 禁止 `JOIN` / 联表查询，跨表展示在 Java 层批量查询后组装。
+- 数据库自动维护的创建/更新时间字段不在业务 SQL 中手动赋值。
+
+## 本地验证
 
 后端：
 
 ```bash
 cd backend
 ./gradlew :services:rfpt-mng:rfpt-mng-provider:compileJava
+./gradlew :services:rfpt-performance:rfpt-performance-provider:compileJava
 ```
 
-前端：
+管理后台：
 
 ```bash
 cd frontend/rfpt-mng-node
 npm install
-npm run dev
+npm run build
+```
+
+员工端 H5：
+
+```bash
+cd frontend/rfpt-h5-node
+npm install
+npm run build
 ```
 
 数据库暂时复用 `rf_tax`，连接信息通过环境变量或配置中心注入，不在源码中保存密码。
 
-## 后端 SQL 约束
+## 部署
 
-- Mapper XML 和注解 SQL 只写简单、直接的单表 SQL。
-- 禁止使用 `JOIN` / 联表查询。
-- 需要跨表展示的数据，先分别按索引条件批量查询，再在 Java Manager / Assembler 层组装。
-- 社保缴费模块也遵循该规则，例如批次地区名称、任务企业名称等展示字段均通过 Java 层回填。
-
-
-## 测试环境 Docker 部署
-
-测试环境部署脚本位于 `deploy/test`，包含后端、前端镜像构建和 `docker compose` 编排。
-
-首次部署：
-
-```bash
-git clone git@codeup.aliyun.com:6a0e7b2c7b6e0a0129639206/rfpt/rfpt.git
-cd rfpt
-cp deploy/test/.env.example deploy/test/.env
-vi deploy/test/.env
-bash deploy/test/deploy.sh
-```
-
-启动后访问：
-
-```text
-http://测试机IP:18092
-```
-
-后端接口默认端口：
-
-```text
-http://测试机IP:18091
-```
-
-详细说明见 `deploy/test/README.md`。
+- 测试环境部署脚本位于 `deploy/test`，使用 Docker Compose 编排。
+- 生产环境部署说明位于 `deploy/prod`，后端和前端 K8s 配置分别位于 `backend/k8s/prod`、`frontend/*/k8s/prod`。

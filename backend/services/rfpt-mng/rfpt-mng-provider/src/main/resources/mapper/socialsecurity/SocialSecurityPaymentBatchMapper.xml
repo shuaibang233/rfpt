@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.zy.rfpt.mng.provider.infrastructure.persistence.socialsecurity.mapper.SocialSecurityPaymentBatchMapper">
-    <resultMap id="BatchMap" type="com.zy.rfpt.mng.provider.infrastructure.persistence.socialsecurity.entity.SocialSecurityPaymentBatchEntity">
+<mapper namespace="com.rfpt.mng.provider.infrastructure.persistence.socialsecurity.mapper.SocialSecurityPaymentBatchMapper">
+    <resultMap id="BatchMap" type="com.rfpt.mng.provider.infrastructure.persistence.socialsecurity.entity.SocialSecurityPaymentBatchEntity">
         <id property="id" column="id"/>
         <result property="regionCode" column="region_code"/>
         <result property="regionName" column="region_name"/>
