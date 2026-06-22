@@ -27,85 +27,27 @@
 
 ## ACK 预置资源
 
-命名空间：`prod`
+ACK/K8s 基础资源复用 `zy_qy`：
 
-镜像拉取：
+- 命名空间：`prod`
+- 镜像拉取：`acr-secret`
+- Nacos Config 入口：`qy-backend-nacos-config`
+- 配置密文解密密钥：`qy-backend-config-crypto-secret`
 
-- `acr-secret`
+`rf-mng` 和 `rf-performance` 的本地 `application.properties` 只保留启动引导配置，真实配置按 `zy_qy` 的两层结构放入 Nacos：
 
-配置：
+1. `common-backend-prod.properties`：后端公共基础设施配置。
+2. `${spring.application.name}-prod.properties`：项目自己的配置。
 
-```yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: rf-backend-config
-  namespace: prod
-data:
-  dubbo-registry-address: nacos://nacos.prod.svc.cluster.local:8848
-  xxl-job-admin-addresses: http://xxl-job-admin.prod.svc.cluster.local:8080/xxl-job-admin
-```
+生产需要在 Nacos 创建：
 
-平台主库密钥：
+| Data ID | 说明 | 样例 |
+| --- | --- | --- |
+| `common-backend-prod.properties` | Dubbo、XXL-JOB 等公共配置 | `backend/docs/config/common-backend-prod.properties` |
+| `rf-mng-prod.properties` | 管理端后端数据库、Cookie、tax-browser-worker 配置 | `backend/docs/config/rf-mng-prod.properties` |
+| `rf-performance-prod.properties` | 员工绩效后端数据库、短信、验证码、XXL-JOB 执行器配置 | `backend/docs/config/rf-performance-prod.properties` |
 
-```yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: rf-platform-db-secret
-  namespace: prod
-type: Opaque
-stringData:
-  url: jdbc:mysql://mysql.prod:3306/rf_pt?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
-  username: rf_pt
-  password: 请替换为生产密码
-```
-
-管理后台密钥：
-
-```yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: rf-mng-secret
-  namespace: prod
-type: Opaque
-stringData:
-  cookie-secret-key: 请替换为固定的16字节Base62编码SM4密钥
-```
-
-机器人协作库密钥：
-
-```yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: rf-robot-db-secret
-  namespace: prod
-type: Opaque
-stringData:
-  url: jdbc:mysql://mysql.prod:3306/rf_robot?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
-  username: rf_robot
-  password: 请替换为生产密码
-```
-
-员工绩效阿里云密钥：
-
-```yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: rf-performance-aliyun-secret
-  namespace: prod
-type: Opaque
-stringData:
-  sms-access-key-id: 请替换
-  sms-access-key-secret: 请替换
-  sms-sign-name: 请替换
-  sms-template-code: 请替换
-  captcha-prefix: 请替换
-  captcha-scene-id: 请替换
-```
+敏感值使用 `SM4_密文`，解密密钥复用 `zy_qy` 的 `QY_CONFIG_CRYPTO_SECRET_KEY` 注入方式，不再为 rf 单独创建数据库、短信、Cookie 等 K8s Secret。
 
 ## 路由建议
 
@@ -116,9 +58,9 @@ stringData:
 
 ## 注意事项
 
-- `rf-performance` 生产模板中已设置：
-  - `RF_PERFORMANCE_H5_SMS_MOCK_ENABLED=false`
-  - `RF_PERFORMANCE_H5_CAPTCHA_ENABLED=true`
+- `rf-performance` 生产配置需要在 `rf-performance-prod.properties` 中设置：
+  - `rf.performance.h5.auth.mock-enabled=false`
+  - `rf.performance.h5.auth.captcha-enabled=true`
 - XXL-JOB 需要在调度中心配置执行器 `rf-performance`，并添加任务 handler：`employeePerformanceAutoConfirmJob`。
 - 数据库拆分为 `rf_pt` 和 `rf_robot`：平台业务表放入 `rf_pt`，tax-browser-worker 与 rf-mng 交互的税务机器人表放入 `rf_robot`。
 - 生产上线前需要在 `rf_pt` 执行 `backend/services/rf-mng/sql/rf_pt/20260622_platform_admin.sql`、`backend/services/rf-performance/sql/20260621_employee_performance.sql` 和 `backend/services/rf-mng/sql/rf_pt/20260615_social_security_payment_management.sql`。

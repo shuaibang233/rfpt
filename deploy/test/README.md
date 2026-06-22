@@ -25,15 +25,17 @@ vi deploy/test/.env
 
 至少需要确认：
 
-- `RF_PLATFORM_DB_URL`
-- `RF_PLATFORM_DB_USERNAME`
-- `RF_PLATFORM_DB_PASSWORD`
-- `RF_ROBOT_DB_URL`
-- `RF_ROBOT_DB_USERNAME`
-- `RF_ROBOT_DB_PASSWORD`
-- `RF_TAX_ROBOT_BASE_URL`
+- `QY_NACOS_CONFIG_SERVER_ADDR`
+- `QY_APPCONF_NACOS_CONFIG_GROUP`
+- `QY_NACOS_NAMESPACE_QY`
+- `QY_CONFIG_CRYPTO_SECRET_KEY`
 
-`RF_TAX_ROBOT_BASE_URL` 指向 `tax-browser-worker`，例如 `http://192.168.110.192:3220`。
+数据库、Cookie、tax-browser-worker 等配置放入 Nacos：
+
+- `common-backend-test.properties`
+- `rf-mng-test.properties`
+
+配置内容可参考生产样例 `backend/docs/config/common-backend-prod.properties` 和 `backend/docs/config/rf-mng-prod.properties`。
 
 ## 启动
 
