@@ -176,7 +176,7 @@ function App() {
           icon={<RetweetOutlined />}
           disabled={!row.retryable}
           onClick={async () => {
-            await retryTask(row.id, 'admin');
+            await retryTask(row.id);
             message.success('已发起重试');
             await loadTasks();
           }}
@@ -254,7 +254,7 @@ function App() {
       siteType: 'default',
       periodMonth: values.periodMonth,
       taxNoList: values.taxNoText.split(/\s|,|，/).map((item: string) => item.trim()).filter(Boolean),
-      operator: values.operator || 'admin',
+      createAdminName: values.createAdminName || 'admin',
     });
     message.success('批次已提交');
     setCreateOpen(false);
@@ -458,7 +458,7 @@ function App() {
       </Layout>
 
       <Modal title="发起社保缴费批次" open={createOpen} onCancel={() => setCreateOpen(false)} onOk={submitCreate} okText="提交执行">
-        <Form layout="vertical" form={form} initialValues={{ regionCode: 'liaoning', operator: 'admin' }}>
+        <Form layout="vertical" form={form} initialValues={{ regionCode: 'liaoning', createAdminName: 'admin' }}>
           <Form.Item name="regionCode" label="地区" rules={[{ required: true }]}>
             <Select options={[{ label: '辽宁', value: 'liaoning' }, { label: '宁波', value: 'ningbo' }, { label: '深圳', value: 'shenzhen' }]} />
           </Form.Item>
@@ -468,7 +468,7 @@ function App() {
           <Form.Item name="taxNoText" label="税号" rules={[{ required: true, message: '请输入至少一个税号' }]}>
             <Input.TextArea rows={5} placeholder="多个税号可用换行、空格或逗号分隔" />
           </Form.Item>
-          <Form.Item name="operator" label="操作人">
+          <Form.Item name="createAdminName" label="创建人">
             <Input />
           </Form.Item>
         </Form>

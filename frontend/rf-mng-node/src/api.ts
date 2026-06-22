@@ -98,7 +98,7 @@ async function unwrap<T>(promise: Promise<{ data: ApiResult<T> | T }>): Promise<
   return body && Object.prototype.hasOwnProperty.call(body, 'data') ? body.data : (response.data as T);
 }
 
-export function createBatch(data: { regionCode: string; siteType: string; periodMonth: string; taxNoList: string[]; operator: string }) {
+export function createBatch(data: { regionCode: string; siteType: string; periodMonth: string; taxNoList: string[]; createAdminId?: number; createAdminName?: string }) {
   return unwrap<number>(request.post('/api/social-security-payments/batches', data));
 }
 
@@ -110,8 +110,8 @@ export function fetchTasks(params: Record<string, unknown>) {
   return unwrap<PageResp<TaskRecord>>(request.get('/api/social-security-payments/tasks', { params }));
 }
 
-export function retryTask(taskId: number, operator: string) {
-  return unwrap<void>(request.post(`/api/social-security-payments/tasks/${taskId}/retry`, { operator }));
+export function retryTask(taskId: number) {
+  return unwrap<void>(request.post(`/api/social-security-payments/tasks/${taskId}/retry`));
 }
 
 export function createPerformanceTask(data: {

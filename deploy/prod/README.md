@@ -109,4 +109,4 @@ stringData:
 - XXL-JOB 需要在调度中心配置执行器 `rf-performance`，并添加任务 handler：`employeePerformanceAutoConfirmJob`。
 - 数据库拆分为 `rf_pt` 和 `rf_robot`：平台业务表放入 `rf_pt`，tax-browser-worker 与 rf-mng 交互的税务机器人表放入 `rf_robot`。
 - 生产上线前需要在 `rf_pt` 执行 `backend/services/rf-performance/sql/20260621_employee_performance.sql` 和 `backend/services/rf-mng/sql/rf_pt/20260615_social_security_payment_management.sql`。
-- 生产上线前需要在 `rf_robot` 执行 qy_robot 税务机器人表结构，并执行 `backend/services/rf-mng/sql/rf_robot/20260615_social_security_payment_task_management_ext.sql`。
+- 生产上线前需要在 `rf_robot` 执行 qy_robot 税务机器人表结构。
