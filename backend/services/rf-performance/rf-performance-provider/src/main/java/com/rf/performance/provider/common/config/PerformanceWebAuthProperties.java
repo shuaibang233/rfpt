@@ -6,18 +6,18 @@ import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.stereotype.Component;
 
 /**
- * 员工绩效 H5 登录配置。
+ * 员工端 Web 登录配置。
  */
 @Data
 @Component
 @RefreshScope
-@ConfigurationProperties(prefix = "rf.performance.h5.auth")
-public class PerformanceH5AuthProperties {
+@ConfigurationProperties(prefix = "rf.performance.web.auth")
+public class PerformanceWebAuthProperties {
 
     /**
-     * 登录 Cookie 名称。
+     * 员工端登录 Cookie 名称。
      */
-    private String cookieName = "RF_PERFORMANCE_MOBILE";
+    public static final String COOKIE_NAME = "webAuthToken";
 
     /**
      * 登录 Cookie 有效秒数。

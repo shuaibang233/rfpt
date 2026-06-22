@@ -5,8 +5,8 @@ import com.rf.performance.provider.application.command.performance.h5.Performanc
 import com.rf.performance.provider.application.command.performance.h5.PerformanceH5SmsSendCommand;
 import com.rf.performance.provider.application.manager.performance.h5.EmployeePerformanceH5Manager;
 import com.rf.performance.provider.application.result.performance.h5.PerformanceH5LoginResult;
-import com.rf.performance.provider.common.config.PerformanceH5AuthProperties;
 import com.rf.performance.provider.common.config.PerformanceSmsProperties;
+import com.rf.performance.provider.common.config.PerformanceWebAuthProperties;
 import com.rf.performance.provider.common.web.PerformanceH5RequestContext;
 import com.rf.performance.provider.interfaces.controller.h5.param.PerformanceH5LoginCtrlParam;
 import com.rf.performance.provider.interfaces.controller.h5.param.PerformanceH5SmsSendCtrlParam;
@@ -38,10 +38,10 @@ public class PerformanceH5AuthController {
     private EmployeePerformanceH5Manager employeePerformanceH5Manager;
 
     /**
-     * H5 登录配置。
+     * 员工端 Web 登录配置。
      */
     @Resource
-    private PerformanceH5AuthProperties performanceH5AuthProperties;
+    private PerformanceWebAuthProperties performanceWebAuthProperties;
 
     /**
      * 短信与验证码配置。
@@ -130,10 +130,10 @@ public class PerformanceH5AuthController {
      * @param mobile 手机号
      */
     private void setLoginCookie(HttpServletResponse response, String mobile) {
-        Cookie cookie = new Cookie(performanceH5AuthProperties.getCookieName(), mobile);
+        Cookie cookie = new Cookie(PerformanceWebAuthProperties.COOKIE_NAME, mobile);
         cookie.setHttpOnly(true);
         cookie.setPath("/");
-        cookie.setMaxAge(performanceH5AuthProperties.getCookieMaxAgeSeconds());
+        cookie.setMaxAge(performanceWebAuthProperties.getCookieMaxAgeSeconds());
         response.addCookie(cookie);
     }
 }
