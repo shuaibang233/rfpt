@@ -112,7 +112,7 @@ stages:
                 print_commit_summary || true
 
                 echo "检查变量"
-                for name in VITE_API_BASE_URL APP_CDN_BASE_URL OSS_ENDPOINT OSS_BUCKET OSS_ACCESS_KEY_ID OSS_ACCESS_KEY_SECRET CR_USER_NAME CR_PWD NGINX_IMAGE; do
+                for name in API_BASE_URL CDN_BASE_URL OSS_ENDPOINT OSS_BUCKET OSS_ACCESS_KEY_ID OSS_ACCESS_KEY_SECRET CR_USER_NAME CR_PWD NGINX_IMAGE; do
                   if [ -z "$(eval echo \$$name)" ]; then
                     echo "$name 未配置"
                     exit 1
@@ -123,16 +123,16 @@ stages:
                 cd frontend/rf-h5-node
 
                 APP_CDN_NAME="rf-h5"
-                APP_CDN_BASE_URL="${APP_CDN_BASE_URL%/}/"
+                CDN_BASE_URL="${CDN_BASE_URL%/}/"
                 OSS_PREFIX="${APP_CDN_NAME}/"
                 OSS_ASSETS_PATH="oss://${OSS_BUCKET}/${OSS_PREFIX}assets"
-                export APP_CDN_BASE_URL
-                export VITE_API_BASE_URL
+                export CDN_BASE_URL
+                export API_BASE_URL
 
                 echo "H5 静态资源配置"
-                echo "VITE_API_BASE_URL=$VITE_API_BASE_URL"
+                echo "API_BASE_URL=$API_BASE_URL"
                 echo "APP_CDN_NAME=$APP_CDN_NAME"
-                echo "APP_CDN_BASE_URL=$APP_CDN_BASE_URL"
+                echo "CDN_BASE_URL=$CDN_BASE_URL"
                 echo "OSS_BUCKET=$OSS_BUCKET"
                 echo "OSS_PREFIX=$OSS_PREFIX"
                 echo "OSS_ASSETS_PATH=$OSS_ASSETS_PATH"

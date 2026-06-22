@@ -8,11 +8,11 @@ const buildAppCdnBaseUrl = (value?: string) => {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  const cdnBaseUrl = buildAppCdnBaseUrl(env.APP_CDN_BASE_URL);
+  const cdnBaseUrl = buildAppCdnBaseUrl(env.CDN_BASE_URL);
 
   return {
     base: cdnBaseUrl,
-    envPrefix: ['VITE_', 'APP_'],
+    envPrefix: ['VITE_', 'API_', 'CDN_'],
     plugins: [react()],
     server: {
       host: '0.0.0.0',
