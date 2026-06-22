@@ -114,6 +114,22 @@ async function unwrap<T>(promise: Promise<{ data: ApiResult<T> | T }>): Promise<
   return body && Object.prototype.hasOwnProperty.call(body, 'data') ? body.data : (response.data as T);
 }
 
+export function getRequestErrorMessage(error: unknown, fallback = '请求失败，请稍后重试') {
+  if (axios.isAxiosError(error)) {
+    const data = error.response?.data as Partial<ApiResult<unknown>> | undefined;
+    if (data?.message) {
+      return data.message;
+    }
+    if (error.message) {
+      return error.message;
+    }
+  }
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  return fallback;
+}
+
 export function login(data: { username: string; password: string; otpCode?: string }) {
   return unwrap<LoginResult>(request.post('/mng/auth/login', data));
 }

@@ -31,6 +31,7 @@ import {
   fetchPerformanceRecords,
   fetchPerformanceTasks,
   fetchTasks,
+  getRequestErrorMessage,
   importPerformanceRecords,
   login,
   logout,
@@ -377,6 +378,8 @@ function App() {
       setLoginUser(result.user);
       window.localStorage.setItem('rf_mng_login_user', JSON.stringify(result.user));
       message.success('登录成功');
+    } catch (error) {
+      message.error(getRequestErrorMessage(error, '登录失败，请检查账号、密码或动态验证码'));
     } finally {
       setLoginLoading(false);
     }
