@@ -395,7 +395,7 @@ function App() {
         <div className="login-panel">
           <div className="login-title">rf-mng</div>
           <div className="login-subtitle">管理后台登录</div>
-          <Form layout="vertical" form={loginForm} initialValues={{ username: 'admin' }} onFinish={submitLogin}>
+          <Form layout="vertical" form={loginForm} onFinish={submitLogin}>
             <Form.Item name="username" label="用户名" rules={[{ required: true, message: '请输入用户名' }]}>
               <Input prefix={<UserOutlined />} autoComplete="username" />
             </Form.Item>
