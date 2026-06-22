@@ -1,4 +1,4 @@
-package com.rf.mng.provider.application.result.admin;
+package com.rf.mng.provider.interfaces.admin.vo;
 
 import lombok.Data;
 
@@ -7,16 +7,16 @@ import java.io.Serializable;
 import java.time.LocalDateTime;
 
 /**
- * 管理员应用结果。
+ * 管理员前端展示对象。
  */
 @Data
-public class AdminResult implements Serializable {
+public class AdminVo implements Serializable {
 
     /** 序列化版本号。 */
     @Serial
     private static final long serialVersionUID = 1L;
 
-    /** 管理员ID。 */
+    /** 管理员 ID。 */
     private Long id;
 
     /** 用户名。 */

@@ -11,8 +11,8 @@ tasks.jar {
 }
 
 dependencies {
-    implementation(project(":common:common-core"))
-    implementation(project(":common:common-utils"))
+    implementation("com.zy:common-core")
+    implementation("com.zy:common-utils")
     implementation(project(":services:rf-mng:rf-mng-api"))
     implementation(project(":services:rf-performance:rf-performance-api"))
 

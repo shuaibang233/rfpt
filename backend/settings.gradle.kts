@@ -14,13 +14,22 @@ dependencyResolutionManagement {
         maven("https://maven.aliyun.com/repository/public")
         maven("https://maven.aliyun.com/repository/spring")
         mavenCentral()
+        maven {
+            url = uri("https://packages.aliyun.com/6a0e7b2c7b6e0a0129639206/maven/zy-common")
+            credentials {
+                username = providers.gradleProperty("mavenUsername")
+                    .orElse(providers.environmentVariable("MAVEN_USERNAME"))
+                    .orNull
+                password = providers.gradleProperty("mavenPassword")
+                    .orElse(providers.environmentVariable("MAVEN_PASSWORD"))
+                    .orNull
+            }
+        }
     }
 }
 
 rootProject.name = "rf-backend"
 
-include("common:common-core")
-include("common:common-utils")
 include("services:rf-mng:rf-mng-api")
 include("services:rf-mng:rf-mng-provider")
 include("services:rf-performance:rf-performance-api")

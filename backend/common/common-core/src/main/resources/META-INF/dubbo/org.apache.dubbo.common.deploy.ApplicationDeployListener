@@ -1,2 +1,0 @@
-mqBroadcastConsumer=com.zy.common.core.mq.impl.RocketMqBroadcastConsumer
-mqConsumer=com.zy.common.core.mq.impl.RocketMqConsumer

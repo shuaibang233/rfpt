@@ -93,6 +93,32 @@ export interface EmployeePerformanceRecord {
   feedbackHandleAdminName?: string;
 }
 
+export interface AdminUser {
+  id: number;
+  username: string;
+  realName?: string;
+  enabled: number;
+  role: number;
+  totpEnabled?: boolean;
+  gmtCreate?: string;
+  gmtModified?: string;
+}
+
+export interface AdminSaveParam {
+  id?: number;
+  username: string;
+  realName?: string;
+  password?: string;
+  enabled?: number;
+  role: number;
+}
+
+export interface AdminTotpResult {
+  secret: string;
+  qrCodeUri: string;
+  username: string;
+}
+
 const request = axios.create({ baseURL: import.meta.env.API_BASE_URL || '', withCredentials: true });
 
 interface ApiResult<T> {
@@ -190,4 +216,28 @@ export function adjustPerformanceRecord(recordId: number, data: {
   operatorMobile?: string;
 }) {
   return unwrap<void>(request.post(`/api/performance/records/${recordId}/adjust`, data));
+}
+
+export function fetchAdmins(params: Record<string, unknown>) {
+  return unwrap<PageResp<AdminUser>>(request.get('/mng/admin/list', { params }));
+}
+
+export function saveAdmin(data: AdminSaveParam) {
+  return unwrap<AdminUser>(request.post('/mng/admin/save', data));
+}
+
+export function updateAdmin(data: AdminSaveParam) {
+  return unwrap<AdminUser>(request.post('/mng/admin/update', data));
+}
+
+export function deleteAdmin(id: number) {
+  return unwrap<void>(request.post('/mng/admin/delete', { id }));
+}
+
+export function generateAdminTotp(userId: number) {
+  return unwrap<AdminTotpResult>(request.post('/mng/admin/generateTotp', { userId }));
+}
+
+export function disableAdminTotp(userId: number) {
+  return unwrap<void>(request.post('/mng/admin/disableTotp', { userId }));
 }

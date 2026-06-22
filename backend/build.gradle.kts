@@ -7,6 +7,7 @@ plugins {
 
 val lombok = libs.lombok
 val javaVersion = "21"
+val commonVersion = providers.gradleProperty("commonVersion").orElse("1.0.0")
 val mapperCaseIdBatchUpdatePattern = Regex("""(?is)<update\b[^>]*>.*?\bCASE\s+id\b.*?</update>""")
 
 val checkMapperCaseIdBatchUpdate by tasks.registering {
@@ -51,6 +52,13 @@ subprojects {
         compileOnly(lombok)
         annotationProcessor(lombok)
         implementation("javax.annotation:javax.annotation-api:1.3.2")
+
+        constraints {
+            api("com.zy:common-core:${commonVersion.get()}")
+            api("com.zy:common-utils:${commonVersion.get()}")
+            implementation("com.zy:common-core:${commonVersion.get()}")
+            implementation("com.zy:common-utils:${commonVersion.get()}")
+        }
 
         testImplementation("org.springframework.boot:spring-boot-starter-test")
         testImplementation("org.mockito:mockito-core")

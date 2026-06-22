@@ -18,4 +18,65 @@
         FROM tb_admin
         WHERE username = #{username}
     </select>
+
+    <select id="selectById" resultMap="AdminMap">
+        SELECT *
+        FROM tb_admin
+        WHERE id = #{id}
+    </select>
+
+    <sql id="AdminWhere">
+        <where>
+            <if test="query.username != null and query.username != ''">
+                AND username LIKE CONCAT('%', #{query.username}, '%')
+            </if>
+            <if test="query.realName != null and query.realName != ''">
+                AND real_name LIKE CONCAT('%', #{query.realName}, '%')
+            </if>
+            <if test="query.role != null">
+                AND role = #{query.role}
+            </if>
+        </where>
+    </sql>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO tb_admin
+        (username, real_name, password, otp_secret, enabled, role)
+        VALUES
+        (#{username}, #{realName}, #{password}, #{otpSecret}, #{enabled}, #{role})
+    </insert>
+
+    <update id="update">
+        UPDATE tb_admin
+        SET real_name = #{realName},
+            password = #{password},
+            enabled = #{enabled},
+            role = #{role}
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateOtpSecret">
+        UPDATE tb_admin
+        SET otp_secret = #{otpSecret}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM tb_admin
+        WHERE id = #{id}
+    </delete>
+
+    <select id="count" resultType="long">
+        SELECT COUNT(1)
+        FROM tb_admin
+        <include refid="AdminWhere"/>
+    </select>
+
+    <select id="page" resultMap="AdminMap">
+        SELECT *
+        FROM tb_admin
+        <include refid="AdminWhere"/>
+        ORDER BY id DESC
+        LIMIT #{offset}, #{limit}
+    </select>
 </mapper>

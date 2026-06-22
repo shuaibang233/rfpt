@@ -1,6 +1,8 @@
 import {
+  BankOutlined,
   DownloadOutlined,
   EditOutlined,
+  EnvironmentOutlined,
   EyeOutlined,
   LoginOutlined,
   LogoutOutlined,
@@ -9,14 +11,20 @@ import {
   RetweetOutlined,
   RocketOutlined,
   SafetyCertificateOutlined,
+  TeamOutlined,
   UploadOutlined,
+  UserSwitchOutlined,
   UserOutlined,
 } from '@ant-design/icons';
-import { Button, DatePicker, Form, Input, Layout, Modal, Select, Space, Table, Tabs, Tag, Typography, message } from 'antd';
+import { Button, DatePicker, Form, Input, Layout, Menu, Modal, Popconfirm, Select, Space, Table, Tabs, Tag, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import type { MenuProps } from 'antd';
 import dayjs from 'dayjs';
 import { useEffect, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import {
+  AdminSaveParam,
+  AdminUser,
   BatchRecord,
   EmployeePerformanceImportItem,
   EmployeePerformanceRecord,
@@ -26,16 +34,22 @@ import {
   adjustPerformanceRecord,
   createBatch,
   createPerformanceTask,
+  deleteAdmin,
+  disableAdminTotp,
   exportPerformanceRecords,
   fetchBatches,
+  fetchAdmins,
   fetchPerformanceRecords,
   fetchPerformanceTasks,
   fetchTasks,
+  generateAdminTotp,
   getRequestErrorMessage,
   importPerformanceRecords,
   login,
   logout,
   retryTask,
+  saveAdmin,
+  updateAdmin,
 } from './api';
 
 const { Header, Content, Sider } = Layout;
@@ -74,33 +88,55 @@ const feedbackStatusText: Record<string, string> = {
   HANDLED_ADJUSTED: '已调整',
 };
 
+const adminRoleOptions = [
+  { value: 1, label: '超级管理员' },
+  { value: 2, label: '管理员' },
+  { value: 3, label: '运营负责人' },
+  { value: 4, label: '商务负责人' },
+  { value: 5, label: '运营' },
+  { value: 6, label: '商务' },
+  { value: 7, label: '客服' },
+  { value: 8, label: '研发' },
+];
+
+type PageKey = 'socialBatches' | 'socialTasks' | 'enterprise' | 'region' | 'performance' | 'admin';
+
 function App() {
   const [loginUser, setLoginUser] = useState<LoginUser | null>(() => readLoginUser());
   const [loginLoading, setLoginLoading] = useState(false);
-  const [moduleKey, setModuleKey] = useState<'social' | 'performance'>('social');
+  const [pageKey, setPageKey] = useState<PageKey>('socialBatches');
   const [batchList, setBatchList] = useState<BatchRecord[]>([]);
   const [taskList, setTaskList] = useState<TaskRecord[]>([]);
   const [performanceTaskList, setPerformanceTaskList] = useState<PerformanceTask[]>([]);
   const [performanceList, setPerformanceList] = useState<EmployeePerformanceRecord[]>([]);
+  const [adminList, setAdminList] = useState<AdminUser[]>([]);
   const [batchLoading, setBatchLoading] = useState(false);
   const [taskLoading, setTaskLoading] = useState(false);
   const [performanceTaskLoading, setPerformanceTaskLoading] = useState(false);
   const [performanceLoading, setPerformanceLoading] = useState(false);
+  const [adminLoading, setAdminLoading] = useState(false);
   const [performanceTaskPage, setPerformanceTaskPage] = useState({ page: 1, size: 10, total: 0 });
   const [performanceRecordPage, setPerformanceRecordPage] = useState({ page: 1, size: 50, total: 0 });
+  const [adminPage, setAdminPage] = useState({ page: 1, size: 10, total: 0 });
   const [createOpen, setCreateOpen] = useState(false);
   const [performanceTaskOpen, setPerformanceTaskOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
+  const [adminTotpOpen, setAdminTotpOpen] = useState(false);
   const [currentRecord, setCurrentRecord] = useState<EmployeePerformanceRecord | null>(null);
+  const [editingAdmin, setEditingAdmin] = useState<AdminUser | null>(null);
+  const [adminTotp, setAdminTotp] = useState<{ secret: string; qrCodeUri: string; username: string } | null>(null);
   const [form] = Form.useForm();
   const [performanceTaskForm] = Form.useForm();
   const [importForm] = Form.useForm();
   const [adjustForm] = Form.useForm();
+  const [adminForm] = Form.useForm<AdminSaveParam>();
   const [loginForm] = Form.useForm();
   const [performanceQueryForm] = Form.useForm();
   const [performanceTaskQueryForm] = Form.useForm();
+  const [adminQueryForm] = Form.useForm();
 
   const loadBatches = async () => {
     setBatchLoading(true);
@@ -154,6 +190,22 @@ function App() {
     }
   };
 
+  const loadAdmins = async (page = adminPage.page, size = adminPage.size) => {
+    setAdminLoading(true);
+    try {
+      const values = adminQueryForm.getFieldsValue();
+      const data = await fetchAdmins({ page, size, ...trimObject(values) });
+      setAdminList(data.list || []);
+      setAdminPage({
+        page: data.pagination?.page || page,
+        size: data.pagination?.size || size,
+        total: data.pagination?.total || 0,
+      });
+    } finally {
+      setAdminLoading(false);
+    }
+  };
+
   useEffect(() => {
     const handleUnauthorized = () => setLoginUser(null);
     window.addEventListener('rf_mng_unauthorized', handleUnauthorized);
@@ -168,6 +220,7 @@ function App() {
     void loadTasks();
     void loadPerformanceTasks(1, 10);
     void loadPerformanceRecords();
+    void loadAdmins(1, 10);
   }, [loginUser]);
 
   const batchColumns: ColumnsType<BatchRecord> = useMemo(() => [
@@ -208,7 +261,7 @@ function App() {
   const performanceColumns: ColumnsType<EmployeePerformanceRecord> = useMemo(() => [
     { title: '记录', dataIndex: 'id', width: 80 },
     { title: '任务', dataIndex: 'taskId', width: 90 },
-    { title: '绩效描述', dataIndex: 'performanceDescription', width: 180, ellipsis: true },
+    { title: '绩效描述', dataIndex: 'performanceDescription', width: 160, ellipsis: true },
     { title: '姓名', dataIndex: 'employeeName', width: 100 },
     { title: '手机号', dataIndex: 'mobile', width: 130 },
     { title: '工号', dataIndex: 'employeeNo', width: 110 },
@@ -266,6 +319,52 @@ function App() {
       ),
     },
   ], [importForm, performanceQueryForm, performanceRecordPage.size]);
+
+  const adminColumns: ColumnsType<AdminUser> = useMemo(() => [
+    { title: 'ID', dataIndex: 'id', width: 80 },
+    { title: '用户名', dataIndex: 'username', width: 150 },
+    { title: '姓名', dataIndex: 'realName', width: 140 },
+    {
+      title: '角色',
+      dataIndex: 'role',
+      width: 130,
+      render: (value: number) => adminRoleOptions.find((item) => item.value === value)?.label || value,
+    },
+    {
+      title: '启用',
+      dataIndex: 'enabled',
+      width: 100,
+      render: (value: number) => <Tag color={value === 1 ? 'success' : 'default'}>{value === 1 ? '是' : '否'}</Tag>,
+    },
+    {
+      title: 'TOTP',
+      dataIndex: 'totpEnabled',
+      width: 110,
+      render: (value: boolean) => <Tag color={value ? 'success' : 'default'}>{value ? '已启用' : '未启用'}</Tag>,
+    },
+    { title: '创建时间', dataIndex: 'gmtCreate', width: 190 },
+    {
+      title: '操作',
+      width: 300,
+      fixed: 'right',
+      render: (_, row) => (
+        <Space>
+          <Button size="small" onClick={() => openAdminEdit(row)}>编辑</Button>
+          <Button size="small" type={row.enabled === 1 ? 'default' : 'primary'} danger={row.enabled === 1} onClick={() => toggleAdminEnabled(row)}>
+            {row.enabled === 1 ? '禁用' : '启用'}
+          </Button>
+          {row.totpEnabled ? (
+            <Button size="small" danger onClick={() => disableTotp(row)}>禁用TOTP</Button>
+          ) : (
+            <Button size="small" onClick={() => generateTotp(row)}>启用TOTP</Button>
+          )}
+          <Popconfirm title="确定删除该管理员？" onConfirm={() => removeAdmin(row)}>
+            <Button size="small" danger>删除</Button>
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ], [adminPage.page, adminPage.size]);
 
   const submitCreate = async () => {
     const values = await form.validateFields();
@@ -349,6 +448,58 @@ function App() {
     await loadPerformanceRecords(performanceRecordPage.page, performanceRecordPage.size);
   };
 
+  const openAdminCreate = () => {
+    setEditingAdmin(null);
+    adminForm.resetFields();
+    adminForm.setFieldsValue({ enabled: 1, role: 2 });
+    setAdminOpen(true);
+  };
+
+  const openAdminEdit = (admin: AdminUser) => {
+    setEditingAdmin(admin);
+    adminForm.setFieldsValue({ ...admin, password: '' });
+    setAdminOpen(true);
+  };
+
+  const submitAdmin = async () => {
+    const values = await adminForm.validateFields();
+    if (editingAdmin) {
+      await updateAdmin({ ...values, id: editingAdmin.id, username: editingAdmin.username });
+      message.success('管理员已更新');
+    } else {
+      await saveAdmin({ ...values, enabled: values.enabled ?? 1 });
+      message.success('管理员已新增');
+    }
+    setAdminOpen(false);
+    adminForm.resetFields();
+    await loadAdmins(adminPage.page, adminPage.size);
+  };
+
+  const toggleAdminEnabled = async (admin: AdminUser) => {
+    await updateAdmin({ ...admin, enabled: admin.enabled === 1 ? 0 : 1 });
+    message.success(admin.enabled === 1 ? '管理员已禁用' : '管理员已启用');
+    await loadAdmins(adminPage.page, adminPage.size);
+  };
+
+  const removeAdmin = async (admin: AdminUser) => {
+    await deleteAdmin(admin.id);
+    message.success('管理员已删除');
+    await loadAdmins(adminPage.page, adminPage.size);
+  };
+
+  const generateTotp = async (admin: AdminUser) => {
+    const result = await generateAdminTotp(admin.id);
+    setAdminTotp(result);
+    setAdminTotpOpen(true);
+    await loadAdmins(adminPage.page, adminPage.size);
+  };
+
+  const disableTotp = async (admin: AdminUser) => {
+    await disableAdminTotp(admin.id);
+    message.success('TOTP 已禁用');
+    await loadAdmins(adminPage.page, adminPage.size);
+  };
+
   const downloadPerformanceExport = async () => {
     const values = performanceQueryForm.getFieldsValue();
     const response = await exportPerformanceRecords({ ...trimObject(values) });
@@ -361,11 +512,17 @@ function App() {
   };
 
   const refreshCurrentModule = () => {
-    if (moduleKey === 'performance') {
+    if (pageKey === 'performance') {
       return Promise.all([
         loadPerformanceTasks(performanceTaskPage.page, performanceTaskPage.size),
         loadPerformanceRecords(performanceRecordPage.page, performanceRecordPage.size),
       ]);
+    }
+    if (pageKey === 'admin') {
+      return loadAdmins(adminPage.page, adminPage.size);
+    }
+    if (pageKey === 'enterprise' || pageKey === 'region') {
+      return Promise.resolve();
     }
     return Promise.all([loadBatches(), loadTasks()]);
   };
@@ -391,6 +548,23 @@ function App() {
     setLoginUser(null);
     message.success('已退出登录');
   };
+
+  const pageMeta = getPageMeta(pageKey);
+  const menuItems: MenuProps['items'] = [
+    {
+      key: 'social',
+      icon: <BankOutlined />,
+      label: '社保缴费',
+      children: [
+        { key: 'socialBatches', label: '缴费批次' },
+        { key: 'socialTasks', label: '任务明细' },
+        { key: 'enterprise', label: '企业维护' },
+        { key: 'region', label: '地区配置' },
+      ],
+    },
+    { key: 'performance', icon: <TeamOutlined />, label: '员工绩效' },
+    { key: 'admin', icon: <UserSwitchOutlined />, label: '系统管理员' },
+  ];
 
   if (!loginUser) {
     return (
@@ -421,22 +595,26 @@ function App() {
     <Layout className="app-shell">
       <Sider width={220} className="app-sider">
         <div className="brand">rf-mng</div>
-        <button className={`nav-item ${moduleKey === 'social' ? 'active' : ''}`} onClick={() => setModuleKey('social')}>社保缴费</button>
-        <button className={`nav-item ${moduleKey === 'performance' ? 'active' : ''}`} onClick={() => setModuleKey('performance')}>员工绩效</button>
-        <button className="nav-item">企业维护</button>
-        <button className="nav-item">地区配置</button>
+        <Menu
+          theme="dark"
+          mode="inline"
+          items={menuItems}
+          selectedKeys={[pageKey]}
+          defaultOpenKeys={['social']}
+          onClick={({ key }) => setPageKey(key as PageKey)}
+        />
       </Sider>
       <Layout>
         <Header className="app-header">
           <div>
-            <div className="title">{moduleKey === 'performance' ? '员工绩效管理' : '社保缴费管理'}</div>
-            <div className="subtitle">{moduleKey === 'performance' ? '创建评价周期，导入员工绩效，跟踪确认反馈和调整闭环' : '按地区、月份发起任务，跟踪电子税务局执行结果'}</div>
+            <div className="title">{pageMeta.title}</div>
+            <div className="subtitle">{pageMeta.subtitle}</div>
           </div>
           <Space>
             <Text type="secondary">{currentAdminName(loginUser)}</Text>
             <Button icon={<LogoutOutlined />} onClick={submitLogout}>退出</Button>
             <Button icon={<ReloadOutlined />} onClick={refreshCurrentModule}>刷新</Button>
-            {moduleKey === 'performance' ? (
+            {pageKey === 'performance' ? (
               <>
                 <Button icon={<DownloadOutlined />} onClick={downloadPerformanceExport}>导出</Button>
                 <Button icon={<DownloadOutlined />} onClick={downloadImportTemplate}>模板</Button>
@@ -446,17 +624,19 @@ function App() {
                   setPerformanceTaskOpen(true);
                 }}>创建绩效</Button>
               </>
-            ) : (
+            ) : pageKey === 'admin' ? (
+              <Button type="primary" icon={<PlusOutlined />} onClick={openAdminCreate}>新增管理员</Button>
+            ) : pageKey === 'socialBatches' || pageKey === 'socialTasks' ? (
               <Button type="primary" icon={<RocketOutlined />} onClick={() => {
                 form.setFieldsValue({ createAdminName: currentAdminName(loginUser) });
                 setCreateOpen(true);
               }}>发起批次</Button>
-            )}
+            ) : null}
           </Space>
         </Header>
         <Content className="app-content">
-          {moduleKey === 'performance' ? (
-            <Space direction="vertical" size={12} className="full-width">
+          {pageKey === 'performance' ? (
+            <div className="page-panel performance-panel">
               <Tabs
                 items={[
                   {
@@ -474,7 +654,7 @@ function App() {
                           loading={performanceTaskLoading}
                           columns={performanceTaskColumns}
                           dataSource={performanceTaskList}
-                          size="middle"
+                          size="small"
                           scroll={{ x: 1200 }}
                           pagination={{
                             current: performanceTaskPage.page,
@@ -508,7 +688,7 @@ function App() {
                           loading={performanceLoading}
                           columns={performanceColumns}
                           dataSource={performanceList}
-                          size="middle"
+                          size="small"
                           scroll={{ x: 1500 }}
                           pagination={{
                             current: performanceRecordPage.page,
@@ -522,14 +702,38 @@ function App() {
                   },
                 ]}
               />
+            </div>
+          ) : pageKey === 'admin' ? (
+            <Space direction="vertical" size={12} className="full-width">
+              <Form layout="inline" form={adminQueryForm} className="query-bar">
+                <Form.Item name="username" label="用户名"><Input placeholder="用户名" allowClear /></Form.Item>
+                <Form.Item name="realName" label="姓名"><Input placeholder="姓名" allowClear /></Form.Item>
+                <Form.Item name="role" label="角色"><Select allowClear placeholder="全部" style={{ width: 140 }} options={adminRoleOptions} /></Form.Item>
+                <Button type="primary" onClick={() => loadAdmins(1, adminPage.size)}>查询</Button>
+              </Form>
+              <Table
+                rowKey="id"
+                loading={adminLoading}
+                columns={adminColumns}
+                dataSource={adminList}
+                size="small"
+                scroll={{ x: 1200 }}
+                pagination={{
+                  current: adminPage.page,
+                  pageSize: adminPage.size,
+                  total: adminPage.total,
+                  onChange: loadAdmins,
+                }}
+              />
             </Space>
+          ) : pageKey === 'socialBatches' ? (
+            <Table rowKey="id" loading={batchLoading} columns={batchColumns} dataSource={batchList} pagination={false} size="small" />
+          ) : pageKey === 'socialTasks' ? (
+            <Table rowKey="id" loading={taskLoading} columns={taskColumns} dataSource={taskList} pagination={false} size="small" scroll={{ x: 1300 }} />
+          ) : pageKey === 'enterprise' ? (
+            <ConfigPlaceholder icon={<BankOutlined />} title="企业维护" description="企业维护属于社保缴费模块，后续可在这里接入企业、税号和社保账号维护能力。" />
           ) : (
-            <Tabs
-              items={[
-                { key: 'batches', label: '缴费批次', children: <Table rowKey="id" loading={batchLoading} columns={batchColumns} dataSource={batchList} pagination={false} size="middle" /> },
-                { key: 'tasks', label: '任务明细', children: <Table rowKey="id" loading={taskLoading} columns={taskColumns} dataSource={taskList} pagination={false} size="middle" scroll={{ x: 1300 }} /> },
-              ]}
-            />
+            <ConfigPlaceholder icon={<EnvironmentOutlined />} title="地区配置" description="地区配置属于社保缴费模块，后续可在这里维护地区编码、站点类型和机器人执行参数。" />
           )}
         </Content>
       </Layout>
@@ -613,8 +817,62 @@ function App() {
           </Form.Item>
         </Form>
       </Modal>
+
+      <Modal title={editingAdmin ? '编辑管理员' : '新增管理员'} open={adminOpen} onCancel={() => setAdminOpen(false)} onOk={submitAdmin} okText="保存">
+        <Form layout="vertical" form={adminForm}>
+          <Form.Item name="username" label="用户名" rules={[{ required: true, message: '请输入用户名' }]}>
+            <Input disabled={!!editingAdmin} />
+          </Form.Item>
+          <Form.Item name="realName" label="姓名" rules={[{ required: true, message: '请输入姓名' }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="password" label="密码" rules={[{ required: !editingAdmin, message: '请输入密码' }]}>
+            <Input.Password placeholder={editingAdmin ? '不修改请留空' : ''} />
+          </Form.Item>
+          <Form.Item name="role" label="角色" rules={[{ required: true, message: '请选择角色' }]}>
+            <Select options={adminRoleOptions} />
+          </Form.Item>
+          <Form.Item name="enabled" label="是否启用" rules={[{ required: true, message: '请选择是否启用' }]}>
+            <Select options={[{ value: 1, label: '是' }, { value: 0, label: '否' }]} />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal title="TOTP 二维码" open={adminTotpOpen} onCancel={() => setAdminTotpOpen(false)} footer={<Button onClick={() => setAdminTotpOpen(false)}>关闭</Button>}>
+        {adminTotp && (
+          <Space direction="vertical" align="center" className="full-width">
+            <Text type="secondary">{adminTotp.username}</Text>
+            <div className="qr-frame">
+              <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(adminTotp.qrCodeUri)}`} alt="TOTP QR Code" />
+            </div>
+            <Text code>{adminTotp.secret}</Text>
+          </Space>
+        )}
+      </Modal>
     </Layout>
   );
+}
+
+function ConfigPlaceholder({ icon, title, description }: { icon: ReactNode; title: string; description: string }) {
+  return (
+    <div className="config-placeholder">
+      <div className="config-icon">{icon}</div>
+      <div className="config-title">{title}</div>
+      <div className="config-description">{description}</div>
+    </div>
+  );
+}
+
+function getPageMeta(pageKey: PageKey) {
+  const meta: Record<PageKey, { title: string; subtitle: string }> = {
+    socialBatches: { title: '社保缴费管理', subtitle: '按地区、月份发起任务，跟踪电子税务局执行结果' },
+    socialTasks: { title: '社保缴费任务', subtitle: '查看税号级缴费任务状态，处理失败任务重试' },
+    enterprise: { title: '企业维护', subtitle: '维护社保缴费相关企业基础信息' },
+    region: { title: '地区配置', subtitle: '维护社保缴费地区与站点配置' },
+    performance: { title: '员工绩效管理', subtitle: '创建评价周期，导入员工绩效，跟踪确认反馈和调整闭环' },
+    admin: { title: '系统管理员', subtitle: '管理后台用户、角色、启用状态和动态验证码' },
+  };
+  return meta[pageKey];
 }
 
 function trimObject(values: Record<string, unknown>) {

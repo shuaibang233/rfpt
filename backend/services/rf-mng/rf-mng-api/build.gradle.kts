@@ -3,5 +3,5 @@ plugins {
 }
 
 dependencies {
-    api(project(":common:common-core"))
+    api("com.zy:common-core")
 }

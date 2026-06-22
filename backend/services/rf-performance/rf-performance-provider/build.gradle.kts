@@ -16,8 +16,8 @@ configurations.configureEach {
 }
 
 dependencies {
-    implementation(project(":common:common-core"))
-    implementation(project(":common:common-utils"))
+    implementation("com.zy:common-core")
+    implementation("com.zy:common-utils")
     implementation(project(":services:rf-performance:rf-performance-api"))
 
     implementation("org.springframework.boot:spring-boot-starter-web")
