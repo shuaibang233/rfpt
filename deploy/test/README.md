@@ -13,7 +13,7 @@
 数据库拆分为平台主库 `rf_pt` 和机器人协作库 `rf_robot`。首次部署前需要确认已经执行：
 
 1. 在 `rf_robot` 执行 qy_robot 税务机器人表结构，例如 `qy_robot/sql/010_add_tax_browser_worker.sql`、`qy_robot/sql/014_add_tax_social_security_payment.sql`、`qy_robot/sql/015_add_tax_bms_feedback.sql`。
-2. 在 `rf_pt` 执行 `backend/services/rf-mng/sql/rf_pt/20260615_social_security_payment_management.sql`。
+2. 在 `rf_pt` 执行平台基础与业务表结构，例如 `backend/services/rf-mng/sql/rf_pt/20260622_platform_admin.sql`、`backend/services/rf-mng/sql/rf_pt/20260615_social_security_payment_management.sql`。
 
 ## 配置环境变量
 
