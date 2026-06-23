@@ -25,6 +25,11 @@ import javax.annotation.Resource;
 public class PerformanceTaskManagerImpl implements PerformanceTaskManager {
 
     /**
+     * 默认二次确认宽限天数。
+     */
+    private static final long DEFAULT_SECOND_CONFIRM_DAYS = 3L;
+
+    /**
      * 绩效任务持久化端口。
      */
     @Resource
@@ -40,11 +45,24 @@ public class PerformanceTaskManagerImpl implements PerformanceTaskManager {
     @Transactional(transactionManager = "transactionManager", rollbackFor = Exception.class)
     public PerformanceTaskResult createTask(PerformanceTaskCreateCommand command) {
         PerformanceTaskCreateCommand safeCommand = command == null ? new PerformanceTaskCreateCommand() : command;
+        fillDefaultSecondConfirmDeadlineTime(safeCommand);
         validateCreateCommand(safeCommand);
         PerformanceTaskRecord record = performanceTaskPersistencePort.insert(toData(safeCommand));
         PerformanceTaskResult result = BeanUtil.copyProperties(record, PerformanceTaskResult.class);
         result.setStatusCode(record.getStatus());
         return result;
+    }
+
+    /**
+     * 补齐默认二次确认截止时间。
+     *
+     * @param command 绩效任务创建命令
+     */
+    private void fillDefaultSecondConfirmDeadlineTime(PerformanceTaskCreateCommand command) {
+        if (command.getConfirmDeadlineTime() == null || command.getSecondConfirmDeadlineTime() != null) {
+            return;
+        }
+        command.setSecondConfirmDeadlineTime(command.getConfirmDeadlineTime().plusDays(DEFAULT_SECOND_CONFIRM_DAYS));
     }
 
     /**

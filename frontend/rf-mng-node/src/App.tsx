@@ -138,6 +138,13 @@ function App() {
   const [performanceQueryForm] = Form.useForm();
   const [performanceTaskQueryForm] = Form.useForm();
   const [adminQueryForm] = Form.useForm();
+  const confirmDeadlineTime = Form.useWatch('confirmDeadlineTime', performanceTaskForm);
+  const secondConfirmDeadlineText = useMemo(() => {
+    if (!confirmDeadlineTime) {
+      return '确认截止后 3 天';
+    }
+    return dayjs(confirmDeadlineTime).endOf('day').add(3, 'day').format('YYYY-MM-DD HH:mm:ss');
+  }, [confirmDeadlineTime]);
 
   const loadBatches = async () => {
     setBatchLoading(true);
@@ -389,10 +396,9 @@ function App() {
       performanceDescription: values.performanceDescription,
       periodStartDate: values.periodRange[0].format('YYYY-MM-DD'),
       periodEndDate: values.periodRange[1].format('YYYY-MM-DD'),
-      confirmDeadlineTime: values.confirmDeadlineTime.format('YYYY-MM-DDTHH:mm:ss'),
-      secondConfirmDeadlineTime: values.secondConfirmDeadlineTime?.format('YYYY-MM-DDTHH:mm:ss'),
+      confirmDeadlineTime: values.confirmDeadlineTime.endOf('day').format('YYYY-MM-DDTHH:mm:ss'),
       createAdminId: loginUser?.id,
-      createAdminName: values.createAdminName || currentAdminName(loginUser),
+      createAdminName: currentAdminName(loginUser),
     });
     message.success(`绩效任务已创建：${task.id}`);
     setPerformanceTaskOpen(false);
@@ -642,10 +648,7 @@ function App() {
                     <Button icon={<DownloadOutlined />} onClick={downloadPerformanceExport}>导出</Button>
                     <Button icon={<DownloadOutlined />} onClick={downloadImportTemplate}>模板</Button>
                     <Button icon={<UploadOutlined />} onClick={() => setImportOpen(true)}>导入绩效</Button>
-                    <Button type="primary" icon={<PlusOutlined />} onClick={() => {
-                      performanceTaskForm.setFieldsValue({ createAdminName: currentAdminName(loginUser) });
-                      setPerformanceTaskOpen(true);
-                    }}>创建绩效</Button>
+                    <Button type="primary" icon={<PlusOutlined />} onClick={() => setPerformanceTaskOpen(true)}>创建绩效</Button>
                   </Space>
                 )}
               >
@@ -809,7 +812,7 @@ function App() {
       </Modal>
 
       <Modal title="创建绩效" open={performanceTaskOpen} onCancel={() => setPerformanceTaskOpen(false)} onOk={submitPerformanceTask} okText="创建">
-        <Form layout="vertical" form={performanceTaskForm} initialValues={{ createAdminName: currentAdminName(loginUser) }}>
+        <Form layout="vertical" form={performanceTaskForm}>
           <Form.Item name="performanceDescription" label="绩效描述" rules={[{ required: true }]}>
             <Input placeholder="如：2026年6月绩效" />
           </Form.Item>
@@ -817,13 +820,13 @@ function App() {
             <DatePicker.RangePicker className="full-width" />
           </Form.Item>
           <Form.Item name="confirmDeadlineTime" label="确认截止时间" rules={[{ required: true }]}>
-            <DatePicker showTime className="full-width" />
+            <DatePicker className="full-width" />
           </Form.Item>
-          <Form.Item name="secondConfirmDeadlineTime" label="二次确认截止时间">
-            <DatePicker showTime className="full-width" />
+          <Form.Item label="二次确认截止时间">
+            <Text className="readonly-field">{secondConfirmDeadlineText}</Text>
           </Form.Item>
-          <Form.Item name="createAdminName" label="创建人">
-            <Input />
+          <Form.Item label="创建人">
+            <Text className="readonly-field">{currentAdminName(loginUser)}</Text>
           </Form.Item>
         </Form>
       </Modal>
