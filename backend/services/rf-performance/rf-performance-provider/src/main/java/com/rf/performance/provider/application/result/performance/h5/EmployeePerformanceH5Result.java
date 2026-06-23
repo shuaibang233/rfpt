@@ -47,4 +47,14 @@ public class EmployeePerformanceH5Result {
      * 确认截止时间展示文本。
      */
     private String confirmDeadlineTime;
+
+    /**
+     * 是否允许确认。
+     */
+    private Boolean confirmAvailable;
+
+    /**
+     * 是否允许反馈。
+     */
+    private Boolean feedbackAvailable;
 }

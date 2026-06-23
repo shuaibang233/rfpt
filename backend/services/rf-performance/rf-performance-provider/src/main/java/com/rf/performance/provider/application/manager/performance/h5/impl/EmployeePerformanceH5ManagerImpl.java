@@ -97,6 +97,7 @@ public class EmployeePerformanceH5ManagerImpl implements EmployeePerformanceH5Ma
         validateMobile(safeCommand.getMobile());
         String scene = StringUtils.defaultIfBlank(safeCommand.getScene(), "LOGIN");
         if (StringUtils.equals(scene, "LOGIN")) {
+            assertMobileInAvailablePerformanceList(safeCommand.getMobile());
             verifyCaptcha(safeCommand.getCaptchaTraceId());
         }
         String code = createSmsCode();
@@ -128,6 +129,7 @@ public class EmployeePerformanceH5ManagerImpl implements EmployeePerformanceH5Ma
         PerformanceSmsEvidenceData smsEvidence = verifySmsCode(safeCommand.getMobile(), "LOGIN", safeCommand.getSmsCode());
         smsEvidence.setVerifiedAt(LocalDateTime.now());
         employeePerformanceH5PersistencePort.markSmsVerified(smsEvidence);
+        assertMobileInAvailablePerformanceList(safeCommand.getMobile());
         PerformanceH5LoginResult result = new PerformanceH5LoginResult();
         result.setMobile(safeCommand.getMobile());
         return result;
@@ -142,8 +144,7 @@ public class EmployeePerformanceH5ManagerImpl implements EmployeePerformanceH5Ma
     @Override
     public List<EmployeePerformanceH5Result> listMine(String mobile) {
         validateMobile(mobile);
-        List<EmployeePerformanceH5Record> records = employeePerformanceH5PersistencePort.listByMobile(mobile);
-        List<EmployeePerformanceH5Record> enrichedRecords = enrichTaskInfo(records);
+        List<EmployeePerformanceH5Record> enrichedRecords = listAvailableRecordsByMobile(mobile);
         return enrichedRecords.stream()
                 .sorted(Comparator.comparing(EmployeePerformanceH5Record::getPeriodStartDate,
                         Comparator.nullsLast(Comparator.reverseOrder())))
@@ -343,6 +344,32 @@ public class EmployeePerformanceH5ManagerImpl implements EmployeePerformanceH5Ma
     }
 
     /**
+     * 校验手机号命中当前可评价名单。
+     *
+     * @param mobile 员工手机号
+     */
+    private void assertMobileInAvailablePerformanceList(String mobile) {
+        if (listAvailableRecordsByMobile(mobile).isEmpty()) {
+            throw new BusinessException(ErrorCode.E999001, "当前手机号暂无可评价的绩效记录");
+        }
+    }
+
+    /**
+     * 按手机号查询当前可评价绩效记录。
+     *
+     * @param mobile 员工手机号
+     * @return 当前可评价绩效记录
+     */
+    private List<EmployeePerformanceH5Record> listAvailableRecordsByMobile(String mobile) {
+        List<EmployeePerformanceH5Record> records = employeePerformanceH5PersistencePort.listByMobile(mobile);
+        List<EmployeePerformanceH5Record> enrichedRecords = enrichTaskInfo(records);
+        LocalDateTime now = LocalDateTime.now();
+        return enrichedRecords.stream()
+                .filter(record -> isBeforeFeedbackDeadline(record, now))
+                .toList();
+    }
+
+    /**
      * 批量补齐绩效任务信息。
      *
      * @param records 员工绩效记录
@@ -515,6 +542,17 @@ public class EmployeePerformanceH5ManagerImpl implements EmployeePerformanceH5Ma
     }
 
     /**
+     * 判断是否在反馈截止前。
+     *
+     * @param record 员工绩效记录
+     * @param now 当前时间
+     * @return 是否在反馈截止前
+     */
+    private boolean isBeforeFeedbackDeadline(EmployeePerformanceH5Record record, LocalDateTime now) {
+        return record.getConfirmDeadlineTime() != null && now.isBefore(record.getConfirmDeadlineTime());
+    }
+
+    /**
      * 转换员工绩效 H5 返回对象。
      *
      * @param record 员工绩效记录
@@ -530,7 +568,35 @@ public class EmployeePerformanceH5ManagerImpl implements EmployeePerformanceH5Ma
         result.setConfirmStatusText(confirmStatusText(record.getConfirmStatus()));
         result.setFeedbackStatus(record.getFeedbackStatus());
         result.setConfirmDeadlineTime(formatDateTime(record.getConfirmDeadlineTime()));
+        LocalDateTime now = LocalDateTime.now();
+        result.setConfirmAvailable(isConfirmAvailable(record, now));
+        result.setFeedbackAvailable(isFeedbackAvailable(record, now));
         return result;
+    }
+
+    /**
+     * 判断是否允许确认。
+     *
+     * @param record 员工绩效记录
+     * @param now 当前时间
+     * @return 是否允许确认
+     */
+    private boolean isConfirmAvailable(EmployeePerformanceH5Record record, LocalDateTime now) {
+        return PerformanceConfirmStatus.PENDING_CONFIRM.getCode().equals(record.getConfirmStatus())
+                && isBeforeFeedbackDeadline(record, now);
+    }
+
+    /**
+     * 判断是否允许反馈。
+     *
+     * @param record 员工绩效记录
+     * @param now 当前时间
+     * @return 是否允许反馈
+     */
+    private boolean isFeedbackAvailable(EmployeePerformanceH5Record record, LocalDateTime now) {
+        return PerformanceConfirmStatus.PENDING_CONFIRM.getCode().equals(record.getConfirmStatus())
+                && PerformanceFeedbackStatus.NONE.getCode().equals(record.getFeedbackStatus())
+                && isBeforeFeedbackDeadline(record, now);
     }
 
     /**

@@ -196,7 +196,7 @@ export function PerformanceHomePage() {
         <main className="content">
           <section className="login-panel">
             <h1>手机号登录</h1>
-            <p>请输入已导入绩效记录的手机号。</p>
+            <p>请输入名单内且当前有可评价绩效的手机号。</p>
             <Form layout="vertical" footer={
               <Button block color="primary" loading={loading} onClick={login}>
                 登录
@@ -234,14 +234,14 @@ export function PerformanceHomePage() {
       <main className="content">
         <section className="summary-band">
           <div>
-            <p className="summary-label">当前待处理</p>
+            <p className="summary-label">当前可评价</p>
             <h1>{records.length}</h1>
           </div>
-          <span>请在截止时间前完成确认或反馈</span>
+          <span>选择一项绩效评价后完成确认或反馈</span>
         </section>
 
         {records.length === 0 ? (
-          <Empty description="暂无绩效记录" />
+          <Empty description="暂无可评价绩效" />
         ) : (
           <List className="record-list">
             {records.map((record) => (
@@ -258,10 +258,10 @@ export function PerformanceHomePage() {
                 <div className="record-title">{record.performanceDescription}</div>
                 <div className="record-score">绩效：{record.performance}</div>
                 <div className="record-actions">
-                  <Button size="mini" color="primary" disabled={!canConfirm(record)} onClick={() => confirmRecord(record)}>
+                  <Button size="mini" color="primary" disabled={!record.confirmAvailable} onClick={() => confirmRecord(record)}>
                     确认
                   </Button>
-                  <Button size="mini" disabled={!canFeedback(record)} onClick={() => feedbackRecord(record)}>
+                  <Button size="mini" disabled={!record.feedbackAvailable} onClick={() => feedbackRecord(record)}>
                     反馈
                   </Button>
                 </div>
@@ -272,14 +272,6 @@ export function PerformanceHomePage() {
       </main>
     </div>
   );
-}
-
-function canConfirm(record: EmployeePerformance) {
-  return record.confirmStatus === 'PENDING_CONFIRM' || record.confirmStatus === 'PENDING_SECOND_CONFIRM';
-}
-
-function canFeedback(record: EmployeePerformance) {
-  return record.confirmStatus === 'PENDING_CONFIRM' && record.feedbackStatus === 'NONE';
 }
 
 async function promptSmsCode(title: string) {
