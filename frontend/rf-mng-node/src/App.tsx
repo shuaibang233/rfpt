@@ -105,7 +105,7 @@ type PageKey = 'socialBatches' | 'socialTasks' | 'enterprise' | 'region' | 'perf
 function App() {
   const [loginUser, setLoginUser] = useState<LoginUser | null>(() => readLoginUser());
   const [loginLoading, setLoginLoading] = useState(false);
-  const [pageKey, setPageKey] = useState<PageKey>('socialBatches');
+  const [pageKey, setPageKey] = useState<PageKey>(() => getPageKeyByPath(window.location.pathname));
   const [batchList, setBatchList] = useState<BatchRecord[]>([]);
   const [taskList, setTaskList] = useState<TaskRecord[]>([]);
   const [performanceTaskList, setPerformanceTaskList] = useState<PerformanceTask[]>([]);
@@ -218,6 +218,14 @@ function App() {
     const handleUnauthorized = () => setLoginUser(null);
     window.addEventListener('rf_mng_unauthorized', handleUnauthorized);
     return () => window.removeEventListener('rf_mng_unauthorized', handleUnauthorized);
+  }, []);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setPageKey(getPageKeyByPath(window.location.pathname));
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
   useEffect(() => {
@@ -616,7 +624,7 @@ function App() {
           items={menuItems}
           selectedKeys={[pageKey]}
           defaultOpenKeys={['social']}
-          onClick={({ key }) => setPageKey(key as PageKey)}
+          onClick={({ key }) => navigateToPage(key as PageKey, pageKey, setPageKey)}
         />
       </Sider>
       <Layout>
@@ -927,6 +935,41 @@ function getPageMeta(pageKey: PageKey) {
     admin: { title: '系统管理员', subtitle: '管理后台用户、角色、启用状态和动态验证码' },
   };
   return meta[pageKey];
+}
+
+function getPagePath(pageKey: PageKey) {
+  const pathMap: Record<PageKey, string> = {
+    socialBatches: '/social-security/batches',
+    socialTasks: '/social-security/tasks',
+    enterprise: '/social-security/enterprise',
+    region: '/social-security/region',
+    performance: '/performance',
+    admin: '/admin',
+  };
+  return pathMap[pageKey];
+}
+
+function getPageKeyByPath(pathname: string): PageKey {
+  const normalizedPath = pathname.replace(/\/+$/, '') || '/';
+  const pageMap: Array<{ prefix: string; key: PageKey }> = [
+    { prefix: '/social-security/batches', key: 'socialBatches' },
+    { prefix: '/social-security/tasks', key: 'socialTasks' },
+    { prefix: '/social-security/enterprise', key: 'enterprise' },
+    { prefix: '/social-security/region', key: 'region' },
+    { prefix: '/performance', key: 'performance' },
+    { prefix: '/admin', key: 'admin' },
+  ];
+  const matched = pageMap.find((item) => normalizedPath === item.prefix || normalizedPath.startsWith(`${item.prefix}/`));
+  return matched?.key || 'socialBatches';
+}
+
+function navigateToPage(nextPageKey: PageKey, currentPageKey: PageKey, setPageKey: (pageKey: PageKey) => void) {
+  if (nextPageKey === currentPageKey) {
+    return;
+  }
+  const nextPath = getPagePath(nextPageKey);
+  window.history.pushState({}, '', nextPath);
+  setPageKey(nextPageKey);
 }
 
 function trimObject(values: Record<string, unknown>) {
