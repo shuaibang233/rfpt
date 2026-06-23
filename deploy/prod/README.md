@@ -55,7 +55,7 @@ ACK/K8s 基础资源复用 `zy_qy`：
 
 | Data ID | 说明 | 样例 |
 | --- | --- | --- |
-| `rf-mng-prod.properties` | 管理端后端数据库、ID 编解码、Cookie、tax-browser-worker、Dubbo、数据库字段加密配置 | `backend/docs/config/rf-mng-prod.properties` |
+| `rf-mng-prod.properties` | 管理端后端数据库、ID 编解码、Cookie、Dubbo、数据库字段加密配置 | `backend/docs/config/rf-mng-prod.properties` |
 | `rf-performance-prod.properties` | 员工绩效后端数据库、短信、验证码、XXL-JOB 执行器配置 | `backend/docs/config/rf-performance-prod.properties` |
 
 Dubbo 注册、配置和元数据中心复用 `zy_qy` 公共配置里的 `ns-qy-dubbo` 命名空间；应用配置仍放在 `ns-qy-appconf`。如果服务启动后 Nacos 看不到 provider，优先确认当前环境实际读取的是 `zy_qy` 已维护的 `common-backend-prod.properties`。
@@ -84,6 +84,7 @@ kubectl -n prod get deploy rf-mng rf-performance -o yaml | grep -n "rf-platform-
 
 - `rf-mng` 生产配置需要在 `rf-mng-prod.properties` 中设置：
   - `id-codec.enabled=true`：启用 ID 编解码自动配置；接口字段仍需要在代码中使用 `@IdEncode` / `@IdDecode` 标注才会实际生效。
+  - `rf.robot.schema-init.enabled=true`：启动时通过 Java 初始化逻辑幂等补齐社保机器人协作字段和索引，不使用存储过程。
   - `db.encrypt.enabled=true`、`db.encrypt.secrets.S1=SM4_密文` 和 `db.encrypt.tables.tb_admin.columns.otp_secret.*`：启用 `tb_admin.otp_secret` 字段透明加解密。
   - `dubbo.protocol.id=dubbo`、`dubbo.protocol.port=20891`、`dubbo.application.qos-port=22221`、`dubbo.scan.base-packages=com.rf.mng.provider.interfaces.remoteserviceimpl`：避免与其他生产服务默认端口冲突，并对齐 `zy_qy` 的 Dubbo 扫描配置。
 - `rf-performance` 生产配置需要在 `rf-performance-prod.properties` 中设置：
@@ -98,6 +99,6 @@ kubectl -n prod get deploy rf-mng rf-performance -o yaml | grep -n "rf-platform-
   - `rf-performance.sms.captcha-prefix=验证码身份标识`
   - `rf-performance.sms.captcha-scene-id=验证码场景ID`
 - XXL-JOB 需要在调度中心配置执行器 `rf-performance`，并添加任务 handler：`employeePerformanceAutoConfirmJob`。
-- 数据库拆分为 `rf_pt` 和 `rf_robot`：平台业务表放入 `rf_pt`，tax-browser-worker 与 rf-mng 交互的税务机器人表放入 `rf_robot`。
+- 数据库拆分为 `rf_pt` 和 `rf_robot`：平台业务表放入 `rf_pt`，tax-browser-worker 与 rf-mng 通过 `rf_robot` 税务机器人表交互，管理端不直连内网机器人服务。
 - 生产上线前需要在 `rf_pt` 执行 `backend/services/rf-mng/sql/rf_pt/20260622_platform_admin.sql`、`backend/services/rf-performance/sql/20260621_employee_performance.sql` 和 `backend/services/rf-mng/sql/rf_pt/20260615_social_security_payment_management.sql`。
-- 生产上线前需要在 `rf_robot` 执行 qy_robot 税务机器人表结构。
+- 生产上线前需要在 `rf_robot` 执行 qy_robot 税务机器人基础表结构；社保协作队列字段和索引由 rf-mng 启动时 Java 初始化逻辑自动补齐。如需关闭自动补齐，再人工执行无存储过程兜底脚本 `backend/services/rf-mng/sql/rf_robot/20260623_social_security_payment_task_queue.sql`。

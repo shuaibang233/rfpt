@@ -83,6 +83,18 @@ public class PerformanceMngController {
     }
 
     /**
+     * 删除绩效任务。
+     *
+     * @param taskId 绩效任务 ID
+     * @return 删除结果
+     */
+    @PostMapping("/tasks/{taskId}/delete")
+    public Result<Void> deleteTask(@PathVariable Long taskId) {
+        performanceMngManager.deleteTask(taskId);
+        return Result.success();
+    }
+
+    /**
      * 导入员工绩效记录。
      *
      * @param taskId 绩效任务 ID

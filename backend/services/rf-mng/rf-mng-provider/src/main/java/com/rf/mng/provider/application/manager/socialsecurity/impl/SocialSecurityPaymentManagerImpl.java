@@ -6,7 +6,6 @@ import com.zy.common.core.exception.BusinessException;
 import com.rf.mng.provider.application.command.socialsecurity.SocialSecurityPaymentBatchCreateCommand;
 import com.rf.mng.provider.application.command.socialsecurity.SocialSecurityPaymentTaskRetryCommand;
 import com.rf.mng.provider.application.manager.socialsecurity.SocialSecurityPaymentManager;
-import com.rf.mng.provider.application.port.gateway.robot.tax.TaxRobotGateway;
 import com.rf.mng.provider.application.port.persistence.socialsecurity.SocialSecurityPaymentBatchPersistencePort;
 import com.rf.mng.provider.application.port.persistence.socialsecurity.SocialSecurityRobotReferencePersistencePort;
 import com.rf.mng.provider.application.port.persistence.socialsecurity.SocialSecurityPaymentTaskPersistencePort;
@@ -14,6 +13,7 @@ import com.rf.mng.provider.application.port.persistence.socialsecurity.data.Soci
 import com.rf.mng.provider.application.port.persistence.socialsecurity.data.SocialSecurityPaymentTaskData;
 import com.rf.mng.provider.application.port.persistence.socialsecurity.record.SocialSecurityPaymentBatchRecord;
 import com.rf.mng.provider.application.port.persistence.socialsecurity.record.SocialSecurityPaymentTaskRecord;
+import com.rf.mng.provider.application.port.persistence.socialsecurity.record.SocialSecurityPaymentTaskSummaryRecord;
 import com.rf.mng.provider.application.query.socialsecurity.SocialSecurityPaymentBatchQuery;
 import com.rf.mng.provider.application.query.socialsecurity.SocialSecurityPaymentTaskQuery;
 import com.rf.mng.provider.application.result.socialsecurity.SocialSecurityPaymentBatchResult;
@@ -23,8 +23,6 @@ import com.rf.mng.provider.domain.socialsecurity.SocialSecurityPaymentTaskStatus
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import javax.annotation.Resource;
 import java.util.ArrayList;
@@ -50,10 +48,6 @@ public class SocialSecurityPaymentManagerImpl implements SocialSecurityPaymentMa
     @Resource
     private SocialSecurityRobotReferencePersistencePort robotReferencePersistencePort;
 
-    /** 税务机器人网关。 */
-    @Resource
-    private TaxRobotGateway taxRobotGateway;
-
     @Override
     @Transactional(rollbackFor = Exception.class, transactionManager = "transactionManager")
     public Long createBatch(SocialSecurityPaymentBatchCreateCommand command) {
@@ -72,7 +66,6 @@ public class SocialSecurityPaymentManagerImpl implements SocialSecurityPaymentMa
 
         List<SocialSecurityPaymentTaskData> tasks = buildTasks(batch, command);
         taskPersistencePort.batchInsert(tasks);
-        triggerAfterCommit(tasks);
         return batch.getId();
     }
 
@@ -81,6 +74,7 @@ public class SocialSecurityPaymentManagerImpl implements SocialSecurityPaymentMa
         long total = batchPersistencePort.count(query);
         List<SocialSecurityPaymentBatchRecord> batches = batchPersistencePort.page(query);
         fillRegionNames(batches);
+        fillBatchTaskSummaries(batches);
         List<SocialSecurityPaymentBatchResult> list = batches.stream()
                 .map(this::toBatchResult)
                 .toList();
@@ -99,7 +93,7 @@ public class SocialSecurityPaymentManagerImpl implements SocialSecurityPaymentMa
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class, transactionManager = "transactionManager")
+    @Transactional(rollbackFor = Exception.class, transactionManager = "robotTransactionManager")
     public void retryTask(SocialSecurityPaymentTaskRetryCommand command) {
         SocialSecurityPaymentTaskRecord task = taskPersistencePort.findById(command.getTaskId());
         if (task == null) {
@@ -109,18 +103,6 @@ public class SocialSecurityPaymentManagerImpl implements SocialSecurityPaymentMa
             throw new BusinessException(ErrorCode.E999001, "当前任务不允许重试");
         }
         taskPersistencePort.markRetry(command.getTaskId());
-        triggerAfterCommit(List.of(toTriggerTaskData(task)));
-    }
-
-    private void triggerAfterCommit(List<SocialSecurityPaymentTaskData> tasks) {
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                for (SocialSecurityPaymentTaskData task : tasks) {
-                    taxRobotGateway.triggerSocialSecurityPayment(task.getTaxNo(), task.getSiteType(), task.getPeriodMonth());
-                }
-            }
-        });
     }
 
     private int countTaxNos(SocialSecurityPaymentBatchCreateCommand command) {
@@ -128,14 +110,6 @@ public class SocialSecurityPaymentManagerImpl implements SocialSecurityPaymentMa
             return 0;
         }
         return (int) command.getTaxNoList().stream().filter(StringUtils::isNotBlank).count();
-    }
-
-    private SocialSecurityPaymentTaskData toTriggerTaskData(SocialSecurityPaymentTaskRecord record) {
-        SocialSecurityPaymentTaskData data = new SocialSecurityPaymentTaskData();
-        data.setTaxNo(record.getTaxNo());
-        data.setSiteType(record.getSiteType());
-        data.setPeriodMonth(record.getPeriodMonth());
-        return data;
     }
 
     /**
@@ -152,6 +126,9 @@ public class SocialSecurityPaymentManagerImpl implements SocialSecurityPaymentMa
                 .filter(StringUtils::isNotBlank)
                 .distinct()
                 .toList();
+        if (regionCodes.isEmpty()) {
+            return;
+        }
         List<SocialSecurityPaymentBatchRecord> regions = robotReferencePersistencePort.listRegionNamesByRegionCodes(regionCodes);
         Map<String, String> regionNameMap = new HashMap<>();
         for (SocialSecurityPaymentBatchRecord region : regions) {
@@ -159,6 +136,36 @@ public class SocialSecurityPaymentManagerImpl implements SocialSecurityPaymentMa
         }
         for (SocialSecurityPaymentBatchRecord batch : batches) {
             batch.setRegionName(regionNameMap.get(batch.getRegionCode()));
+        }
+    }
+
+    /**
+     * 批量回填社保缴费批次任务汇总。
+     *
+     * @param batches 社保缴费批次
+     */
+    private void fillBatchTaskSummaries(List<SocialSecurityPaymentBatchRecord> batches) {
+        if (batches == null || batches.isEmpty()) {
+            return;
+        }
+        List<Long> batchIds = batches.stream()
+                .map(SocialSecurityPaymentBatchRecord::getId)
+                .distinct()
+                .toList();
+        List<SocialSecurityPaymentTaskSummaryRecord> summaries = taskPersistencePort.listSummaryByBatchIds(batchIds);
+        Map<Long, SocialSecurityPaymentTaskSummaryRecord> summaryMap = new HashMap<>();
+        for (SocialSecurityPaymentTaskSummaryRecord summary : summaries) {
+            summaryMap.put(summary.getBatchId(), summary);
+        }
+        for (SocialSecurityPaymentBatchRecord batch : batches) {
+            SocialSecurityPaymentTaskSummaryRecord summary = summaryMap.get(batch.getId());
+            if (summary == null) {
+                continue;
+            }
+            batch.setTotalCount(defaultInt(summary.getTotalCount()));
+            batch.setSuccessCount(defaultInt(summary.getSuccessCount()));
+            batch.setFailedCount(defaultInt(summary.getFailedCount()));
+            batch.setStatus(calculateBatchStatus(summary));
         }
     }
 
@@ -176,6 +183,9 @@ public class SocialSecurityPaymentManagerImpl implements SocialSecurityPaymentMa
                 .filter(StringUtils::isNotBlank)
                 .distinct()
                 .toList();
+        if (taxNos.isEmpty()) {
+            return;
+        }
         List<SocialSecurityPaymentTaskRecord> enterprises = robotReferencePersistencePort.listEnterpriseInfoByTaxNos(taxNos);
         Map<String, SocialSecurityPaymentTaskRecord> enterpriseMap = new HashMap<>();
         for (SocialSecurityPaymentTaskRecord enterprise : enterprises) {
@@ -214,7 +224,7 @@ public class SocialSecurityPaymentManagerImpl implements SocialSecurityPaymentMa
             task.setRegionCode(batch.getRegionCode());
             task.setSiteType(batch.getSiteType());
             task.setPeriodMonth(batch.getPeriodMonth());
-            task.setStatus(SocialSecurityPaymentTaskStatus.PROCESSING.name());
+            task.setStatus(SocialSecurityPaymentTaskStatus.PENDING.name());
             task.setRetryable(Boolean.FALSE);
             task.setRetryCount(0);
             task.setMaxRetryCount(3);
@@ -256,7 +266,52 @@ public class SocialSecurityPaymentManagerImpl implements SocialSecurityPaymentMa
         result.setErrorCode(entity.getErrorCode());
         result.setErrorMessage(entity.getErrorMessage());
         result.setRetryable(entity.getRetryable());
+        result.setWorkerId(entity.getWorkerId());
+        result.setClaimedAt(entity.getClaimedAt());
+        result.setHeartbeatAt(entity.getHeartbeatAt());
+        result.setFinishedAt(entity.getFinishedAt());
         result.setGmtModified(entity.getGmtModified());
         return result;
+    }
+
+    /**
+     * 根据任务汇总计算批次状态。
+     *
+     * @param summary 任务汇总
+     * @return 批次状态
+     */
+    private String calculateBatchStatus(SocialSecurityPaymentTaskSummaryRecord summary) {
+        int totalCount = defaultInt(summary.getTotalCount());
+        if (totalCount == 0) {
+            return SocialSecurityPaymentBatchStatus.SUBMITTED.name();
+        }
+        int successCount = defaultInt(summary.getSuccessCount());
+        int failedCount = defaultInt(summary.getFailedCount());
+        int canceledCount = defaultInt(summary.getCanceledCount());
+        int processingCount = defaultInt(summary.getProcessingCount());
+        int finishedCount = successCount + failedCount + canceledCount;
+        if (successCount == totalCount) {
+            return SocialSecurityPaymentBatchStatus.SUCCESS.name();
+        }
+        if (failedCount == totalCount) {
+            return SocialSecurityPaymentBatchStatus.FAILED.name();
+        }
+        if (finishedCount == totalCount) {
+            return SocialSecurityPaymentBatchStatus.PARTIAL_SUCCESS.name();
+        }
+        if (processingCount > 0 || finishedCount > 0) {
+            return SocialSecurityPaymentBatchStatus.RUNNING.name();
+        }
+        return SocialSecurityPaymentBatchStatus.SUBMITTED.name();
+    }
+
+    /**
+     * 空整数按零处理。
+     *
+     * @param value 整数值
+     * @return 非空整数
+     */
+    private int defaultInt(Integer value) {
+        return value == null ? 0 : value;
     }
 }

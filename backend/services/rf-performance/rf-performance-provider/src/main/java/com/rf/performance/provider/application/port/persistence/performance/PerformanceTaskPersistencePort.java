@@ -75,4 +75,12 @@ public interface PerformanceTaskPersistencePort {
      * @return 是否更新成功
      */
     boolean increaseTotalCount(Long id, int count);
+
+    /**
+     * 删除绩效任务。
+     *
+     * @param id 绩效任务 ID
+     * @return 是否删除成功
+     */
+    boolean deleteById(Long id);
 }

@@ -47,4 +47,14 @@ public class RemotePerformanceTaskServiceImpl implements RemotePerformanceTaskSe
         return RemotePerformanceTaskConverter.toDtoPage(
                 performanceTaskManager.pageTasks(RemotePerformanceTaskConverter.toPageQuery(param)));
     }
+
+    /**
+     * 删除绩效任务。
+     *
+     * @param taskId 绩效任务 ID
+     */
+    @Override
+    public void deleteTask(Long taskId) {
+        performanceTaskManager.deleteTask(taskId);
+    }
 }

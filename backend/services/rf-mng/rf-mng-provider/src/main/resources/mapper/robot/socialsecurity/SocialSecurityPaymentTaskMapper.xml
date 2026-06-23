@@ -8,17 +8,35 @@
         <result property="enterpriseName" column="enterprise_name"/>
         <result property="securityAccountName" column="security_account_name"/>
         <result property="regionCode" column="region_code"/>
+        <result property="siteType" column="site_type"/>
         <result property="periodMonth" column="settle_month"/>
         <result property="status" column="task_status"/>
         <result property="payableAmount" column="tax_total_amount"/>
+        <result property="errorCode" column="error_code"/>
         <result property="errorMessage" column="error_message"/>
         <result property="retryable" column="retryable"/>
         <result property="retryCount" column="retry_count"/>
         <result property="maxRetryCount" column="max_retry_count"/>
+        <result property="workerId" column="worker_id"/>
+        <result property="claimedAt" column="claimed_at"/>
+        <result property="heartbeatAt" column="heartbeat_at"/>
+        <result property="startedAt" column="started_at"/>
+        <result property="finishedAt" column="finished_at"/>
+        <result property="resultPayload" column="result_payload"/>
         <result property="createAdminId" column="create_admin_id"/>
         <result property="createAdminName" column="create_admin_name"/>
         <result property="gmtCreate" column="gmt_create"/>
         <result property="gmtModified" column="gmt_modified"/>
+    </resultMap>
+
+    <resultMap id="TaskSummaryMap" type="com.rf.mng.provider.infrastructure.persistence.socialsecurity.entity.SocialSecurityPaymentTaskSummaryEntity">
+        <id property="batchId" column="batch_id"/>
+        <result property="totalCount" column="total_count"/>
+        <result property="pendingCount" column="pending_count"/>
+        <result property="processingCount" column="processing_count"/>
+        <result property="successCount" column="success_count"/>
+        <result property="failedCount" column="failed_count"/>
+        <result property="canceledCount" column="canceled_count"/>
     </resultMap>
 
     <sql id="TaskWhere">
@@ -37,10 +55,10 @@
 
     <insert id="batchInsert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO tb_tax_social_security_payment_task
-        (batch_id, tax_no, region_code, settle_month, task_status, retryable, retry_count, max_retry_count, create_admin_id, create_admin_name)
+        (batch_id, tax_no, region_code, site_type, settle_month, task_status, retryable, retry_count, max_retry_count, create_admin_id, create_admin_name)
         VALUES
         <foreach collection="list" item="item" separator=",">
-            (#{item.batchId}, #{item.taxNo}, #{item.regionCode}, #{item.periodMonth}, #{item.status}, #{item.retryable}, #{item.retryCount}, #{item.maxRetryCount}, #{item.createAdminId}, #{item.createAdminName})
+            (#{item.batchId}, #{item.taxNo}, #{item.regionCode}, #{item.siteType}, #{item.periodMonth}, #{item.status}, #{item.retryable}, #{item.retryCount}, #{item.maxRetryCount}, #{item.createAdminId}, #{item.createAdminName})
         </foreach>
     </insert>
 
@@ -52,10 +70,27 @@
 
     <update id="markRetry">
         UPDATE tb_tax_social_security_payment_task
-        SET task_status = 'PROCESSING', retryable = 0, retry_count = retry_count + 1,
-            error_message = NULL
+        SET task_status = 'PENDING', retryable = 0, retry_count = retry_count + 1,
+            worker_id = NULL, claimed_at = NULL, heartbeat_at = NULL, started_at = NULL, finished_at = NULL,
+            error_code = NULL, error_message = NULL, result_payload = NULL
         WHERE id = #{id}
     </update>
+
+    <select id="listSummaryByBatchIds" resultMap="TaskSummaryMap">
+        SELECT batch_id,
+               COUNT(1) AS total_count,
+               SUM(CASE WHEN task_status = 'PENDING' THEN 1 ELSE 0 END) AS pending_count,
+               SUM(CASE WHEN task_status = 'PROCESSING' THEN 1 ELSE 0 END) AS processing_count,
+               SUM(CASE WHEN task_status = 'SUCCESS' THEN 1 ELSE 0 END) AS success_count,
+               SUM(CASE WHEN task_status = 'FAILED' THEN 1 ELSE 0 END) AS failed_count,
+               SUM(CASE WHEN task_status = 'CANCELED' THEN 1 ELSE 0 END) AS canceled_count
+        FROM tb_tax_social_security_payment_task
+        WHERE batch_id IN
+        <foreach collection="batchIds" item="batchId" open="(" separator="," close=")">
+            #{batchId}
+        </foreach>
+        GROUP BY batch_id
+    </select>
 
     <select id="count" resultType="long">
         SELECT COUNT(1)

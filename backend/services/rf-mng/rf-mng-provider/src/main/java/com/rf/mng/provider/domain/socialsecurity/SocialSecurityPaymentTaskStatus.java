@@ -5,6 +5,8 @@ package com.rf.mng.provider.domain.socialsecurity;
  */
 public enum SocialSecurityPaymentTaskStatus {
 
+    /** 等待机器人领取。 */
+    PENDING,
     /** 执行中。 */
     PROCESSING,
     /** 已成功。 */

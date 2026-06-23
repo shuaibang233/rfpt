@@ -81,4 +81,12 @@ public interface PerformanceTaskMapper {
      * @return 影响行数
      */
     int increaseTotalCount(@Param("id") Long id, @Param("count") int count);
+
+    /**
+     * 逻辑删除绩效任务。
+     *
+     * @param id 绩效任务 ID
+     * @return 影响行数
+     */
+    int deleteById(@Param("id") Long id);
 }

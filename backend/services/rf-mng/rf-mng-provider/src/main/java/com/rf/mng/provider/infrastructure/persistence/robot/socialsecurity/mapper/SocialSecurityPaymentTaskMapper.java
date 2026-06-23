@@ -2,6 +2,7 @@ package com.rf.mng.provider.infrastructure.persistence.robot.socialsecurity.mapp
 
 import com.rf.mng.provider.application.query.socialsecurity.SocialSecurityPaymentTaskQuery;
 import com.rf.mng.provider.infrastructure.persistence.socialsecurity.entity.SocialSecurityPaymentTaskEntity;
+import com.rf.mng.provider.infrastructure.persistence.socialsecurity.entity.SocialSecurityPaymentTaskSummaryEntity;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -21,6 +22,9 @@ public interface SocialSecurityPaymentTaskMapper {
 
     /** 标记待重试。 */
     int markRetry(@Param("id") Long id);
+
+    /** 按批次编号汇总任务状态。 */
+    List<SocialSecurityPaymentTaskSummaryEntity> listSummaryByBatchIds(@Param("batchIds") List<Long> batchIds);
 
     /** 按条件统计。 */
     long count(@Param("query") SocialSecurityPaymentTaskQuery query);

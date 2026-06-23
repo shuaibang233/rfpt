@@ -25,7 +25,6 @@ dependencies {
     implementation(libs.hutool.all)
     implementation(libs.commons.lang3)
     implementation(libs.fastjson2)
-    implementation(libs.okhttp)
     implementation(libs.totp)
     implementation("jakarta.validation:jakarta.validation-api")
 

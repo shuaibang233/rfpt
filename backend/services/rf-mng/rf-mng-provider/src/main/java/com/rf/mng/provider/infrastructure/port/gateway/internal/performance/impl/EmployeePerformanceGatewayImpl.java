@@ -61,6 +61,16 @@ public class EmployeePerformanceGatewayImpl implements EmployeePerformanceGatewa
         return toTaskResultPage(dtoPage);
     }
 
+    /**
+     * 删除绩效任务。
+     *
+     * @param taskId 绩效任务 ID
+     */
+    @Override
+    public void deleteTask(Long taskId) {
+        remotePerformanceTaskService.deleteTask(taskId);
+    }
+
     @Override
     public EmployeePerformanceImportResult importRecords(EmployeePerformanceImportCommand command) {
         EmployeePerformanceImportCommand safeCommand = command == null ? new EmployeePerformanceImportCommand() : command;

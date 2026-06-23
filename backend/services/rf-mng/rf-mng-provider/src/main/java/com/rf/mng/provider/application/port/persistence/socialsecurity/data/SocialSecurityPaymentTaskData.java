@@ -23,7 +23,7 @@ public class SocialSecurityPaymentTaskData implements Serializable {
     private String taxNo;
     /** 地区编码。 */
     private String regionCode;
-    /** 站点类型，管理端触发机器人时使用。 */
+    /** 站点类型，机器人领取任务后用于选择站点。 */
     private String siteType;
     /** 费款所属月份。 */
     private String periodMonth;

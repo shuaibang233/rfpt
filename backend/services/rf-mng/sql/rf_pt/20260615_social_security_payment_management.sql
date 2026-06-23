@@ -1,6 +1,6 @@
 -- 社保缴费管理端第一阶段表结构。
 -- 数据库：rf_pt
--- 依赖：请先在 rf_robot 执行 qy_robot 税务机器人表结构。
+-- 依赖：请先在 rf_robot 执行 qy_robot 税务机器人基础表结构；协作队列字段由 rf-mng 启动时自动补齐。
 
 CREATE TABLE IF NOT EXISTS `tb_tax_social_security_payment_batch` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键编号',

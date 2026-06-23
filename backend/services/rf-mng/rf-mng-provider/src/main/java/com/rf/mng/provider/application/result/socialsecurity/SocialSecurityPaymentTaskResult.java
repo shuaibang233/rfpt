@@ -53,6 +53,18 @@ public class SocialSecurityPaymentTaskResult implements Serializable {
     /** 是否允许重试。 */
     private Boolean retryable;
 
+    /** 领取任务的机器人编号。 */
+    private String workerId;
+
+    /** 机器人领取时间。 */
+    private LocalDateTime claimedAt;
+
+    /** 机器人心跳时间。 */
+    private LocalDateTime heartbeatAt;
+
+    /** 机器人完成时间。 */
+    private LocalDateTime finishedAt;
+
     /** 修改时间。 */
     private LocalDateTime gmtModified;
 }

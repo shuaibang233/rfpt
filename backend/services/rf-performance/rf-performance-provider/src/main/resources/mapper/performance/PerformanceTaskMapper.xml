@@ -98,4 +98,11 @@
         WHERE id = #{id}
           AND is_deleted = 0
     </update>
+
+    <update id="deleteById">
+        UPDATE tb_employee_performance_task
+        SET is_deleted = 1
+        WHERE id = #{id}
+          AND is_deleted = 0
+    </update>
 </mapper>

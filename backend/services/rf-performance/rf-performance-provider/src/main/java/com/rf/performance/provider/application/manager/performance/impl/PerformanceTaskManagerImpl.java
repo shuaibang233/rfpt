@@ -79,6 +79,33 @@ public class PerformanceTaskManagerImpl implements PerformanceTaskManager {
     }
 
     /**
+     * 删除绩效任务。
+     *
+     * @param taskId 绩效任务 ID
+     */
+    @Override
+    @Transactional(transactionManager = "transactionManager", rollbackFor = Exception.class)
+    public void deleteTask(Long taskId) {
+        if (taskId == null) {
+            throw new BusinessException(ErrorCode.E999001, "绩效任务ID不能为空");
+        }
+        PerformanceTaskRecord taskRecord = performanceTaskPersistencePort.getById(taskId);
+        if (taskRecord == null || Integer.valueOf(1).equals(taskRecord.getIsDeleted())) {
+            throw new BusinessException(ErrorCode.E999001, "绩效任务不存在");
+        }
+        if (!PerformanceTaskStatus.DRAFT.getCode().equals(taskRecord.getStatus())) {
+            throw new BusinessException(ErrorCode.E999001, "仅草稿状态的绩效任务支持删除");
+        }
+        if (taskRecord.getTotalCount() != null && taskRecord.getTotalCount() > 0) {
+            throw new BusinessException(ErrorCode.E999001, "已导入员工记录的绩效任务不支持删除");
+        }
+        boolean deleted = performanceTaskPersistencePort.deleteById(taskId);
+        if (!deleted) {
+            throw new BusinessException(ErrorCode.E999001, "绩效任务删除失败");
+        }
+    }
+
+    /**
      * 校验绩效任务创建命令。
      *
      * @param command 绩效任务创建命令

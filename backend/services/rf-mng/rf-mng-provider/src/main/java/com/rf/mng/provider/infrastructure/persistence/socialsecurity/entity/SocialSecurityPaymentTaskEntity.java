@@ -29,7 +29,7 @@ public class SocialSecurityPaymentTaskEntity implements Serializable {
     private String securityAccountName;
     /** 地区编码。 */
     private String regionCode;
-    /** 站点类型，管理端触发机器人时使用，不落任务表。 */
+    /** 站点类型，机器人领取任务后用于选择站点。 */
     private String siteType;
     /** 费款所属月份。 */
     private String periodMonth;
@@ -47,6 +47,18 @@ public class SocialSecurityPaymentTaskEntity implements Serializable {
     private Integer retryCount;
     /** 最大重试次数。 */
     private Integer maxRetryCount;
+    /** 领取任务的机器人编号。 */
+    private String workerId;
+    /** 机器人领取时间。 */
+    private LocalDateTime claimedAt;
+    /** 机器人心跳时间。 */
+    private LocalDateTime heartbeatAt;
+    /** 机器人开始执行时间。 */
+    private LocalDateTime startedAt;
+    /** 机器人完成时间。 */
+    private LocalDateTime finishedAt;
+    /** 机器人回写结果明细。 */
+    private String resultPayload;
     /** 创建管理员ID。 */
     private Long createAdminId;
     /** 创建管理员名称。 */

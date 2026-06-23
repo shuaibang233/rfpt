@@ -23,8 +23,8 @@ body { margin: 0; background: #f5f7fb; color: #1f2937; font-family: -apple-syste
 .full-width { width: 100%; }
 .query-bar { padding: 12px 12px 0; background: #f8fafc; border: 1px solid #eef2f7; border-radius: 8px; }
 .toolbar-row { display: flex; align-items: center; justify-content: space-between; }
-.info-card .ant-card-head { min-height: 48px; }
-.info-card .ant-descriptions { margin-top: 4px; }
+.table-action-group .ant-btn { border-radius: 6px; }
+.modal-toolbar { margin-bottom: 12px; display: flex; justify-content: flex-end; }
 .ant-card { border-radius: 10px; border-color: #eef2f7; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03); }
 .ant-card .ant-card-head { padding-inline: 16px; }
 .ant-card .ant-card-body { padding: 16px; }

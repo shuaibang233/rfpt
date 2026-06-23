@@ -49,6 +49,16 @@ public class PerformanceMngManagerImpl implements PerformanceMngManager {
     }
 
     /**
+     * 删除绩效任务。
+     *
+     * @param taskId 绩效任务 ID
+     */
+    @Override
+    public void deleteTask(Long taskId) {
+        employeePerformanceGateway.deleteTask(taskId);
+    }
+
+    /**
      * 导入员工绩效记录。
      *
      * @param command 员工绩效导入命令

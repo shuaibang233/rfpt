@@ -25,4 +25,11 @@ public interface PerformanceTaskManager {
      * @return 绩效任务分页
      */
     PageResp<PerformanceTaskResult> pageTasks(PerformanceTaskPageQuery query);
+
+    /**
+     * 删除绩效任务。
+     *
+     * @param taskId 绩效任务 ID
+     */
+    void deleteTask(Long taskId);
 }

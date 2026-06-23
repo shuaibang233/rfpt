@@ -52,4 +52,9 @@ public class PerformanceTaskRecord {
      * 任务是否删除。
      */
     private Integer isDeleted;
+
+    /**
+     * 员工总数。
+     */
+    private Integer totalCount;
 }

@@ -3,8 +3,10 @@ package com.rf.mng.provider.infrastructure.persistence.socialsecurity.impl;
 import com.rf.mng.provider.application.port.persistence.socialsecurity.SocialSecurityPaymentTaskPersistencePort;
 import com.rf.mng.provider.application.port.persistence.socialsecurity.data.SocialSecurityPaymentTaskData;
 import com.rf.mng.provider.application.port.persistence.socialsecurity.record.SocialSecurityPaymentTaskRecord;
+import com.rf.mng.provider.application.port.persistence.socialsecurity.record.SocialSecurityPaymentTaskSummaryRecord;
 import com.rf.mng.provider.application.query.socialsecurity.SocialSecurityPaymentTaskQuery;
 import com.rf.mng.provider.infrastructure.persistence.socialsecurity.entity.SocialSecurityPaymentTaskEntity;
+import com.rf.mng.provider.infrastructure.persistence.socialsecurity.entity.SocialSecurityPaymentTaskSummaryEntity;
 import com.rf.mng.provider.infrastructure.persistence.robot.socialsecurity.mapper.SocialSecurityPaymentTaskMapper;
 import org.springframework.stereotype.Repository;
 
@@ -39,6 +41,15 @@ public class SocialSecurityPaymentTaskPersistencePortImpl implements SocialSecur
     @Override
     public int markRetry(Long id) {
         return mapper.markRetry(id);
+    }
+
+    @Override
+    public List<SocialSecurityPaymentTaskSummaryRecord> listSummaryByBatchIds(List<Long> batchIds) {
+        if (batchIds == null || batchIds.isEmpty()) {
+            return List.of();
+        }
+        List<SocialSecurityPaymentTaskSummaryEntity> entities = mapper.listSummaryByBatchIds(batchIds);
+        return entities.stream().map(this::toSummaryRecord).toList();
     }
 
     @Override
@@ -87,10 +98,34 @@ public class SocialSecurityPaymentTaskPersistencePortImpl implements SocialSecur
         record.setRetryable(entity.getRetryable());
         record.setRetryCount(entity.getRetryCount());
         record.setMaxRetryCount(entity.getMaxRetryCount());
+        record.setWorkerId(entity.getWorkerId());
+        record.setClaimedAt(entity.getClaimedAt());
+        record.setHeartbeatAt(entity.getHeartbeatAt());
+        record.setStartedAt(entity.getStartedAt());
+        record.setFinishedAt(entity.getFinishedAt());
+        record.setResultPayload(entity.getResultPayload());
         record.setCreateAdminId(entity.getCreateAdminId());
         record.setCreateAdminName(entity.getCreateAdminName());
         record.setGmtCreate(entity.getGmtCreate());
         record.setGmtModified(entity.getGmtModified());
+        return record;
+    }
+
+    /**
+     * 转换任务批次汇总记录。
+     *
+     * @param entity 任务批次汇总实体
+     * @return 任务批次汇总记录
+     */
+    private SocialSecurityPaymentTaskSummaryRecord toSummaryRecord(SocialSecurityPaymentTaskSummaryEntity entity) {
+        SocialSecurityPaymentTaskSummaryRecord record = new SocialSecurityPaymentTaskSummaryRecord();
+        record.setBatchId(entity.getBatchId());
+        record.setTotalCount(entity.getTotalCount());
+        record.setPendingCount(entity.getPendingCount());
+        record.setProcessingCount(entity.getProcessingCount());
+        record.setSuccessCount(entity.getSuccessCount());
+        record.setFailedCount(entity.getFailedCount());
+        record.setCanceledCount(entity.getCanceledCount());
         return record;
     }
 }

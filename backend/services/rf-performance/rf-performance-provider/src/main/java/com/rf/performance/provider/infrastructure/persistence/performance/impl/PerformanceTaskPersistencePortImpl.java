@@ -129,4 +129,15 @@ public class PerformanceTaskPersistencePortImpl implements PerformanceTaskPersis
     public boolean increaseTotalCount(Long id, int count) {
         return performanceTaskMapper.increaseTotalCount(id, count) > 0;
     }
+
+    /**
+     * 删除绩效任务。
+     *
+     * @param id 绩效任务 ID
+     * @return 是否删除成功
+     */
+    @Override
+    public boolean deleteById(Long id) {
+        return performanceTaskMapper.deleteById(id) > 0;
+    }
 }

@@ -42,6 +42,10 @@ export interface TaskRecord {
   errorCode?: string;
   errorMessage?: string;
   retryable?: boolean;
+  workerId?: string;
+  claimedAt?: string;
+  heartbeatAt?: string;
+  finishedAt?: string;
   gmtModified?: string;
 }
 
@@ -194,6 +198,10 @@ export function createPerformanceTask(data: {
 
 export function fetchPerformanceTasks(params: Record<string, unknown>) {
   return unwrap<PageResp<PerformanceTask>>(request.get('/api/performance/tasks', { params }));
+}
+
+export function deletePerformanceTask(taskId: number) {
+  return unwrap<void>(request.post(`/api/performance/tasks/${taskId}/delete`));
 }
 
 export function importPerformanceRecords(taskId: number, records: EmployeePerformanceImportItem[]) {

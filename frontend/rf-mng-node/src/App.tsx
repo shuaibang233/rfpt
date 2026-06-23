@@ -1,6 +1,7 @@
 import {
   HomeOutlined,
   BankOutlined,
+  DeleteOutlined,
   DownloadOutlined,
   EditOutlined,
   EnvironmentOutlined,
@@ -35,6 +36,7 @@ import {
   adjustPerformanceRecord,
   createBatch,
   createPerformanceTask,
+  deletePerformanceTask,
   deleteAdmin,
   disableAdminTotp,
   exportPerformanceRecords,
@@ -59,6 +61,7 @@ const { Text } = Typography;
 const statusColor: Record<string, string> = {
   SUBMITTED: 'processing',
   RUNNING: 'processing',
+  PROCESSING: 'processing',
   SUCCESS: 'success',
   PARTIAL_SUCCESS: 'warning',
   FAILED: 'error',
@@ -87,6 +90,20 @@ const feedbackStatusText: Record<string, string> = {
   NONE: '无反馈',
   PENDING: '待处理',
   HANDLED_ADJUSTED: '已调整',
+};
+
+const socialTaskStatusText: Record<string, string> = {
+  PENDING: '待机器人领取',
+  PROCESSING: '执行中',
+  SUCCESS: '已成功',
+  FAILED: '已失败',
+  CANCELED: '已取消',
+};
+
+const performanceTaskStatusText: Record<string, string> = {
+  DRAFT: '草稿',
+  CONFIRMING: '确认中',
+  CLOSED: '已截止',
 };
 
 const adminRoleOptions = [
@@ -255,7 +272,8 @@ function App() {
     { title: '社保账号', dataIndex: 'securityAccountName', width: 160 },
     { title: '地区', dataIndex: 'regionCode', width: 110 },
     { title: '月份', dataIndex: 'periodMonth', width: 110 },
-    { title: '状态', dataIndex: 'status', width: 130, render: (value) => <Tag color={statusColor[value] || 'default'}>{value}</Tag> },
+    { title: '状态', dataIndex: 'status', width: 140, render: (value) => <Tag color={statusColor[value] || 'default'}>{socialTaskStatusText[value] || value}</Tag> },
+    { title: '机器人', dataIndex: 'workerId', width: 120, render: (value) => value || '-' },
     { title: '金额', dataIndex: 'payableAmount', width: 120 },
     { title: '失败原因', dataIndex: 'errorMessage', ellipsis: true },
     {
@@ -310,27 +328,47 @@ function App() {
   ], []);
 
   const performanceTaskColumns: ColumnsType<PerformanceTask> = useMemo(() => [
-    { title: '任务', dataIndex: 'id', width: 80 },
     { title: '绩效描述', dataIndex: 'performanceDescription', width: 220, ellipsis: true },
-    { title: '评价周期', width: 210, render: (_, row) => `${row.periodStartDate || '-'} 至 ${row.periodEndDate || '-'}` },
-    { title: '确认截止', dataIndex: 'confirmDeadlineTime', width: 170 },
-    { title: '二次截止', dataIndex: 'secondConfirmDeadlineTime', width: 170 },
-    { title: '状态', dataIndex: 'statusCode', width: 110, render: (value) => <Tag color={statusColor[value] || 'default'}>{value || 'DRAFT'}</Tag> },
+    { title: '评价周期', width: 230, render: (_, row) => formatPeriodRange(row.periodStartDate, row.periodEndDate) },
+    { title: '确认截止', dataIndex: 'confirmDeadlineTime', width: 180, render: (value) => formatDateTime(value) },
+    { title: '二次截止', dataIndex: 'secondConfirmDeadlineTime', width: 180, render: (value) => formatDateTime(value) },
+    {
+      title: '状态',
+      dataIndex: 'statusCode',
+      width: 110,
+      render: (value) => <Tag color={statusColor[value] || 'default'}>{performanceTaskStatusText[value || 'DRAFT'] || value || '草稿'}</Tag>,
+    },
     { title: '人数', width: 170, render: (_, row) => `${row.confirmedCount || 0}/${row.totalCount || 0} 确认，${row.feedbackCount || 0} 反馈` },
     {
       title: '操作',
-      width: 160,
+      width: 250,
       fixed: 'right',
       render: (_, row) => (
-        <Space>
-          <Button size="small" onClick={() => {
-            performanceQueryForm.setFieldValue('taskId', row.id);
-            void loadPerformanceRecords(1, performanceRecordPage.size);
-          }}>查记录</Button>
-          <Button size="small" onClick={() => {
-            importForm.setFieldValue('taskId', row.id);
-            setImportOpen(true);
-          }}>导入</Button>
+        <Space className="table-action-group" wrap>
+          <Button
+            size="small"
+            type="primary"
+            ghost
+            onClick={() => {
+              performanceQueryForm.setFieldValue('taskId', row.id);
+              void loadPerformanceRecords(1, performanceRecordPage.size);
+            }}
+          >
+            查记录
+          </Button>
+          <Button
+            size="small"
+            icon={<UploadOutlined />}
+            onClick={() => {
+              importForm.setFieldValue('taskId', row.id);
+              setImportOpen(true);
+            }}
+          >
+            导入
+          </Button>
+          <Popconfirm title="确定删除该绩效任务？" description="仅支持删除未导入员工记录的草稿任务。" onConfirm={() => void removePerformanceTask(row)}>
+            <Button size="small" danger icon={<DeleteOutlined />}>删除</Button>
+          </Popconfirm>
         </Space>
       ),
     },
@@ -412,6 +450,15 @@ function App() {
     setPerformanceTaskOpen(false);
     performanceTaskForm.resetFields();
     performanceQueryForm.setFieldValue('taskId', task.id);
+    await Promise.all([loadPerformanceTasks(1, performanceTaskPage.size), loadPerformanceRecords(1, performanceRecordPage.size)]);
+  };
+
+  const removePerformanceTask = async (task: PerformanceTask) => {
+    await deletePerformanceTask(task.id);
+    message.success('绩效任务已删除');
+    if (performanceQueryForm.getFieldValue('taskId') === task.id) {
+      performanceQueryForm.setFieldValue('taskId', undefined);
+    }
     await Promise.all([loadPerformanceTasks(1, performanceTaskPage.size), loadPerformanceRecords(1, performanceRecordPage.size)]);
   };
 
@@ -565,14 +612,6 @@ function App() {
   };
 
   const pageMeta = getPageMeta(pageKey);
-  const performanceOverviewItems = [
-    { key: 'description', label: '模块说明', children: pageMeta.subtitle },
-    { key: 'taskTotal', label: '绩效任务数', children: performanceTaskPage.total },
-    { key: 'recordTotal', label: '员工记录数', children: performanceRecordPage.total },
-    { key: 'admin', label: '当前操作人', children: currentAdminName(loginUser) },
-    { key: 'taskStatus', label: '任务筛选状态', children: performanceTaskQueryForm.getFieldValue('status') || '全部' },
-    { key: 'recordStatus', label: '记录反馈状态', children: feedbackStatusText[performanceQueryForm.getFieldValue('feedbackStatus')] || '全部' },
-  ];
   const menuItems: MenuProps['items'] = [
     {
       key: 'social',
@@ -646,22 +685,6 @@ function App() {
           />
           {pageKey === 'performance' ? (
             <div className="page-panel performance-panel">
-              <Card
-                size="small"
-                title="员工绩效基础信息"
-                className="info-card"
-                extra={(
-                  <Space wrap>
-                    <Button icon={<ReloadOutlined />} onClick={refreshCurrentModule}>刷新</Button>
-                    <Button icon={<DownloadOutlined />} onClick={downloadPerformanceExport}>导出</Button>
-                    <Button icon={<DownloadOutlined />} onClick={downloadImportTemplate}>模板</Button>
-                    <Button icon={<UploadOutlined />} onClick={() => setImportOpen(true)}>导入绩效</Button>
-                    <Button type="primary" icon={<PlusOutlined />} onClick={() => setPerformanceTaskOpen(true)}>创建绩效</Button>
-                  </Space>
-                )}
-              >
-                <Descriptions column={3} items={performanceOverviewItems} />
-              </Card>
               <Card size="small">
                 <Tabs
                   items={[
@@ -672,10 +695,21 @@ function App() {
                         <Space direction="vertical" size={12} className="full-width">
                           <div className="toolbar-row">
                             <Text strong>任务列表</Text>
+                            <Space wrap>
+                              <Button icon={<ReloadOutlined />} onClick={() => loadPerformanceTasks(1, performanceTaskPage.size)}>刷新</Button>
+                              <Button type="primary" icon={<PlusOutlined />} onClick={() => setPerformanceTaskOpen(true)}>创建绩效</Button>
+                            </Space>
                           </div>
                           <Form layout="inline" form={performanceTaskQueryForm} className="query-bar">
                             <Form.Item name="performanceDescription" label="绩效描述"><Input placeholder="绩效描述" allowClear /></Form.Item>
-                            <Form.Item name="status" label="状态"><Input placeholder="状态编码" allowClear /></Form.Item>
+                            <Form.Item name="status" label="状态">
+                              <Select
+                                allowClear
+                                placeholder="全部状态"
+                                style={{ width: 140 }}
+                                options={Object.entries(performanceTaskStatusText).map(([value, label]) => ({ value, label }))}
+                              />
+                            </Form.Item>
                             <Button type="primary" onClick={() => loadPerformanceTasks(1, performanceTaskPage.size)}>查询</Button>
                           </Form>
                           <Table
@@ -702,9 +736,25 @@ function App() {
                         <Space direction="vertical" size={12} className="full-width">
                           <div className="toolbar-row">
                             <Text strong>员工记录</Text>
+                            <Space wrap>
+                              <Button icon={<ReloadOutlined />} onClick={() => loadPerformanceRecords(1, performanceRecordPage.size)}>刷新</Button>
+                              <Button icon={<DownloadOutlined />} onClick={downloadPerformanceExport}>导出</Button>
+                            </Space>
                           </div>
                           <Form layout="inline" form={performanceQueryForm} className="query-bar">
-                            <Form.Item name="taskId" label="任务ID"><Input placeholder="任务ID" allowClear /></Form.Item>
+                            <Form.Item name="taskId" label="任务">
+                              <Select
+                                allowClear
+                                showSearch
+                                optionFilterProp="label"
+                                placeholder="请选择绩效任务"
+                                style={{ width: 320 }}
+                                options={performanceTaskList.map((task) => ({
+                                  value: task.id,
+                                  label: `${task.performanceDescription || '未命名任务'}（${formatPeriodRange(task.periodStartDate, task.periodEndDate)}）`,
+                                }))}
+                              />
+                            </Form.Item>
                             <Form.Item name="employeeName" label="姓名"><Input placeholder="员工姓名" allowClear /></Form.Item>
                             <Form.Item name="mobile" label="手机号"><Input placeholder="手机号" allowClear /></Form.Item>
                             <Form.Item name="confirmStatus" label="确认状态">
@@ -839,9 +889,20 @@ function App() {
 
       <Modal title="导入员工绩效" open={importOpen} onCancel={() => setImportOpen(false)} onOk={submitImport} okText="导入" width={720}>
         <Form layout="vertical" form={importForm}>
-          <Form.Item name="taskId" label="绩效任务ID" rules={[{ required: true }]}>
-            <Input placeholder="先创建绩效任务后填写任务ID" />
+          <Form.Item name="taskId" label="绩效任务" rules={[{ required: true, message: '请选择绩效任务' }]}>
+            <Select
+              showSearch
+              optionFilterProp="label"
+              placeholder="请选择绩效任务"
+              options={performanceTaskList.map((task) => ({
+                value: task.id,
+                label: `${task.performanceDescription || '未命名任务'}（${formatPeriodRange(task.periodStartDate, task.periodEndDate)}）`,
+              }))}
+            />
           </Form.Item>
+          <div className="modal-toolbar">
+            <Button icon={<DownloadOutlined />} onClick={downloadImportTemplate}>下载导入模板</Button>
+          </div>
           <Form.Item name="recordsText" label="导入明细" rules={[{ required: true }]}>
             <Input.TextArea
               rows={10}
@@ -976,6 +1037,21 @@ function trimObject(values: Record<string, unknown>) {
   return Object.fromEntries(
     Object.entries(values).filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== ''),
   );
+}
+
+function formatPeriodRange(startDate?: string, endDate?: string) {
+  return `${startDate || '-'} ~ ${endDate || '-'}`;
+}
+
+function formatDateTime(value?: string | number | number[]) {
+  if (!value) {
+    return '-';
+  }
+  if (Array.isArray(value)) {
+    const [year = 0, month = 1, day = 1, hour = 0, minute = 0, second = 0] = value;
+    return dayjs(`${year}-${month}-${day} ${hour}:${minute}:${second}`).format('YYYY-MM-DD HH:mm:ss');
+  }
+  return dayjs(value).format('YYYY-MM-DD HH:mm:ss');
 }
 
 function parseImportRecords(text: string): EmployeePerformanceImportItem[] {
