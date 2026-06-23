@@ -26,10 +26,29 @@ export const request = axios.create({
  * 读取响应中的业务数据。
  */
 function unwrapResult<T>(result: ApiResult<T>): T {
-  if (!result || result.code === 'E000000') {
+  if (!result || result.code === '000000') {
     return result?.data;
   }
   throw new Error(result.message || '请求失败');
+}
+
+/**
+ * 获取请求错误文案。
+ */
+function getRequestErrorMessage(error: unknown) {
+  if (axios.isAxiosError(error)) {
+    const data = error.response?.data as Partial<ApiResult<unknown>> | undefined;
+    if (data?.message) {
+      return data.message;
+    }
+    if (error.message) {
+      return error.message;
+    }
+  }
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  return '网络异常';
 }
 
 /**
@@ -40,7 +59,7 @@ export async function apiGet<T>(url: string, config?: ApiRequestConfig) {
     const response = await request.get<ApiResult<T>>(url, config);
     return unwrapResult(response.data);
   } catch (error) {
-    const message = error instanceof Error ? error.message : '网络异常';
+    const message = getRequestErrorMessage(error);
     if (!config?.silentError) {
       Toast.show({ icon: 'fail', content: message });
     }
@@ -56,7 +75,7 @@ export async function apiPost<T>(url: string, data?: unknown, config?: ApiReques
     const response = await request.post<ApiResult<T>>(url, data, config);
     return unwrapResult(response.data);
   } catch (error) {
-    const message = error instanceof Error ? error.message : '网络异常';
+    const message = getRequestErrorMessage(error);
     if (!config?.silentError) {
       Toast.show({ icon: 'fail', content: message });
     }
