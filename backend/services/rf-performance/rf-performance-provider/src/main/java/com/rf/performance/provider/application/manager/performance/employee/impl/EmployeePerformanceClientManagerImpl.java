@@ -1,0 +1,719 @@
+package com.rf.performance.provider.application.manager.performance.employee.impl;
+
+import com.rf.performance.provider.application.command.performance.employee.EmployeePerformanceConfirmCommand;
+import com.rf.performance.provider.application.command.performance.employee.EmployeePerformanceFeedbackCommand;
+import com.rf.performance.provider.application.command.performance.employee.EmployeePerformanceLoginCommand;
+import com.rf.performance.provider.application.command.performance.employee.EmployeePerformanceSmsSendCommand;
+import com.rf.performance.provider.application.manager.performance.employee.EmployeePerformanceClientManager;
+import com.rf.performance.provider.application.port.gateway.auth.captcha.CaptchaGateway;
+import com.rf.performance.provider.application.port.gateway.auth.captcha.param.CaptchaVerifyGatewayParam;
+import com.rf.performance.provider.application.port.gateway.auth.sms.SmsCodeGateway;
+import com.rf.performance.provider.application.port.gateway.auth.sms.param.SmsCodeSendGatewayParam;
+import com.rf.performance.provider.application.port.persistence.performance.EmployeePerformanceClientPersistencePort;
+import com.rf.performance.provider.application.port.persistence.performance.PerformanceTaskPersistencePort;
+import com.rf.performance.provider.application.port.persistence.performance.data.employee.PerformanceConfirmLogData;
+import com.rf.performance.provider.application.port.persistence.performance.data.employee.PerformanceFeedbackData;
+import com.rf.performance.provider.application.port.persistence.performance.data.employee.PerformanceSmsEvidenceData;
+import com.rf.performance.provider.application.port.persistence.performance.record.PerformanceTaskRecord;
+import com.rf.performance.provider.application.port.persistence.performance.record.employee.EmployeePerformanceClientRecord;
+import com.rf.performance.provider.application.result.performance.employee.EmployeePerformanceClientResult;
+import com.rf.performance.provider.application.result.performance.employee.EmployeePerformanceLoginResult;
+import com.rf.performance.provider.common.config.PerformanceSmsProperties;
+import com.rf.performance.provider.domain.performance.PerformanceConfirmStatus;
+import com.rf.performance.provider.domain.performance.PerformanceFeedbackStatus;
+import com.rf.performance.provider.domain.performance.PerformanceTaskStatus;
+import com.zy.common.core.enums.ErrorCode;
+import com.zy.common.core.exception.BusinessException;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import javax.annotation.Resource;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.regex.Pattern;
+
+/**
+ * 员工端绩效应用编排实现。
+ */
+@Service
+public class EmployeePerformanceClientManagerImpl implements EmployeePerformanceClientManager {
+
+    /**
+     * 手机号格式。
+     */
+    private static final Pattern MOBILE_PATTERN = Pattern.compile("^1\\d{10}$");
+
+    /**
+     * 日期时间格式。
+     */
+    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+    /**
+     * 员工端绩效持久化端口。
+     */
+    @Resource
+    private EmployeePerformanceClientPersistencePort employeePerformanceClientPersistencePort;
+
+    /**
+     * 绩效任务持久化端口。
+     */
+    @Resource
+    private PerformanceTaskPersistencePort performanceTaskPersistencePort;
+
+    /**
+     * 短信与验证码配置。
+     */
+    @Resource
+    private PerformanceSmsProperties performanceSmsProperties;
+
+    /**
+     * 图形验证码校验网关。
+     */
+    @Resource
+    private CaptchaGateway captchaGateway;
+
+    /**
+     * 短信验证码发送网关。
+     */
+    @Resource
+    private SmsCodeGateway smsCodeGateway;
+
+    /**
+     * 发送短信验证码。
+     *
+     * @param command 短信发送命令
+     * @return 短信验证留痕 ID
+     */
+    @Override
+    public Long sendSmsCode(EmployeePerformanceSmsSendCommand command) {
+        EmployeePerformanceSmsSendCommand safeCommand = command == null ? new EmployeePerformanceSmsSendCommand() : command;
+        validateMobile(safeCommand.getMobile());
+        String scene = StringUtils.defaultIfBlank(safeCommand.getScene(), "LOGIN");
+        if (StringUtils.equals(scene, "LOGIN")) {
+            assertMobileInPerformanceList(safeCommand.getMobile());
+            verifyCaptcha(safeCommand.getCaptchaTraceId());
+        }
+        String code = createSmsCode();
+        if (!Boolean.TRUE.equals(performanceSmsProperties.getMockEnabled())) {
+            sendRealSmsCode(safeCommand.getMobile(), code);
+        }
+        PerformanceSmsEvidenceData data = new PerformanceSmsEvidenceData();
+        data.setMobile(safeCommand.getMobile());
+        data.setScene(scene);
+        data.setSmsCode(code);
+        data.setSmsSendBizId(UUID.randomUUID().toString());
+        data.setCaptchaTraceId(safeCommand.getCaptchaTraceId());
+        data.setIpAddress(safeCommand.getIpAddress());
+        data.setUserAgent(safeCommand.getUserAgent());
+        data.setSentAt(LocalDateTime.now());
+        return employeePerformanceClientPersistencePort.insertSmsEvidence(data);
+    }
+
+    /**
+     * 手机号登录。
+     *
+     * @param command 登录命令
+     * @return 登录结果
+     */
+    @Override
+    public EmployeePerformanceLoginResult login(EmployeePerformanceLoginCommand command) {
+        EmployeePerformanceLoginCommand safeCommand = command == null ? new EmployeePerformanceLoginCommand() : command;
+        validateMobile(safeCommand.getMobile());
+        PerformanceSmsEvidenceData smsEvidence = verifySmsCode(safeCommand.getMobile(), "LOGIN", safeCommand.getSmsCode());
+        smsEvidence.setVerifiedAt(LocalDateTime.now());
+        employeePerformanceClientPersistencePort.markSmsVerified(smsEvidence);
+        assertMobileInPerformanceList(safeCommand.getMobile());
+        EmployeePerformanceLoginResult result = new EmployeePerformanceLoginResult();
+        result.setMobile(safeCommand.getMobile());
+        return result;
+    }
+
+    /**
+     * 查询当前员工绩效记录。
+     *
+     * @param mobile 登录手机号
+     * @return 员工绩效记录
+     */
+    @Override
+    public List<EmployeePerformanceClientResult> listMine(String mobile, boolean includeHistory) {
+        validateMobile(mobile);
+        List<EmployeePerformanceClientRecord> enrichedRecords = includeHistory ? listAllRecordsByMobile(mobile) : listAvailableRecordsByMobile(mobile);
+        return enrichedRecords.stream()
+                .sorted(Comparator.comparing(EmployeePerformanceClientRecord::getPeriodStartDate,
+                        Comparator.nullsLast(Comparator.reverseOrder())))
+                .map(this::toResult)
+                .toList();
+    }
+
+    /**
+     * 确认绩效。
+     *
+     * @param command 确认命令
+     */
+    @Override
+    @Transactional(transactionManager = "transactionManager", rollbackFor = Exception.class)
+    public void confirm(EmployeePerformanceConfirmCommand command) {
+        EmployeePerformanceConfirmCommand safeCommand = command == null ? new EmployeePerformanceConfirmCommand() : command;
+        validateMobile(safeCommand.getMobile());
+        PerformanceSmsEvidenceData smsEvidence = verifySmsCode(safeCommand.getMobile(), "CONFIRM", safeCommand.getSmsCode());
+        EmployeePerformanceClientRecord record = requireRecord(safeCommand.getRecordId(), safeCommand.getMobile());
+        assertConfirmAllowed(record);
+        smsEvidence.setVerifiedAt(LocalDateTime.now());
+        employeePerformanceClientPersistencePort.markSmsVerified(smsEvidence);
+        insertConfirmLog(safeCommand, record, smsEvidence);
+        String nextStatus = nextConfirmStatus(record.getConfirmStatus());
+        if (!employeePerformanceClientPersistencePort.markConfirmed(record.getId(), record.getMobile(), nextStatus)) {
+            throw new BusinessException(ErrorCode.E999002, "绩效确认失败");
+        }
+        performanceTaskPersistencePort.increaseConfirmedCount(record.getTaskId(), 1);
+    }
+
+    /**
+     * 提交绩效反馈。
+     *
+     * @param command 反馈命令
+     */
+    @Override
+    @Transactional(transactionManager = "transactionManager", rollbackFor = Exception.class)
+    public void feedback(EmployeePerformanceFeedbackCommand command) {
+        EmployeePerformanceFeedbackCommand safeCommand = command == null ? new EmployeePerformanceFeedbackCommand() : command;
+        validateMobile(safeCommand.getMobile());
+        if (StringUtils.isBlank(safeCommand.getFeedbackContent())) {
+            throw new BusinessException(ErrorCode.E999001, "反馈内容不能为空");
+        }
+        EmployeePerformanceClientRecord record = requireRecord(safeCommand.getRecordId(), safeCommand.getMobile());
+        assertFeedbackAllowed(record);
+        PerformanceFeedbackData data = new PerformanceFeedbackData();
+        data.setTaskId(record.getTaskId());
+        data.setRecordId(record.getId());
+        data.setMobile(record.getMobile());
+        data.setFeedbackContent(safeCommand.getFeedbackContent());
+        data.setPerformanceSnapshot(record.getPerformance());
+        data.setIpAddress(safeCommand.getIpAddress());
+        data.setUserAgent(safeCommand.getUserAgent());
+        data.setStatus(PerformanceFeedbackStatus.PENDING.getCode());
+        if (!employeePerformanceClientPersistencePort.insertFeedback(data)) {
+            throw new BusinessException(ErrorCode.E999002, "绩效反馈提交失败");
+        }
+        if (!employeePerformanceClientPersistencePort.markFeedbackSubmitted(record.getId(), record.getMobile())) {
+            throw new BusinessException(ErrorCode.E999002, "绩效反馈状态更新失败");
+        }
+        performanceTaskPersistencePort.increaseFeedbackCount(record.getTaskId(), 1);
+    }
+
+    /**
+     * 自动确认超期绩效记录。
+     *
+     * @param limit 单次处理上限
+     * @return 处理数量
+     */
+    @Override
+    @Transactional(transactionManager = "transactionManager", rollbackFor = Exception.class)
+    public int autoConfirmExpiredRecords(int limit) {
+        int safeLimit = limit <= 0 ? 500 : limit;
+        List<Long> firstTaskIds = performanceTaskPersistencePort.listExpiredFirstConfirmTaskIds(safeLimit);
+        List<EmployeePerformanceClientRecord> firstRecords = employeePerformanceClientPersistencePort
+                .listPendingFirstConfirmRecordsByTaskIds(firstTaskIds, safeLimit);
+        int firstCount = autoConfirm(firstRecords, "AUTO_CONFIRM", PerformanceConfirmStatus.AUTO_CONFIRMED.getCode());
+        int secondLimit = Math.max(safeLimit - firstCount, 0);
+        if (secondLimit <= 0) {
+            return firstCount;
+        }
+        List<Long> secondTaskIds = performanceTaskPersistencePort.listExpiredSecondConfirmTaskIds(secondLimit);
+        List<EmployeePerformanceClientRecord> secondRecords = employeePerformanceClientPersistencePort
+                .listPendingSecondConfirmRecordsByTaskIds(secondTaskIds, secondLimit);
+        int secondCount = autoConfirm(secondRecords, "SECOND_AUTO_CONFIRM", PerformanceConfirmStatus.SECOND_AUTO_CONFIRMED.getCode());
+        return firstCount + secondCount;
+    }
+
+    /**
+     * 校验手机号。
+     *
+     * @param mobile 手机号
+     */
+    private void validateMobile(String mobile) {
+        if (StringUtils.isBlank(mobile) || !MOBILE_PATTERN.matcher(mobile).matches()) {
+            throw new BusinessException(ErrorCode.E999001, "请输入正确的手机号");
+        }
+    }
+
+    /**
+     * 自动确认指定记录。
+     *
+     * @param records 员工绩效记录
+     * @param confirmType 确认类型
+     * @param confirmStatus 确认状态
+     * @return 处理数量
+     */
+    private int autoConfirm(List<EmployeePerformanceClientRecord> records, String confirmType, String confirmStatus) {
+        if (records == null || records.isEmpty()) {
+            return 0;
+        }
+        List<PerformanceConfirmLogData> logs = new ArrayList<>();
+        List<Long> ids = new ArrayList<>();
+        for (EmployeePerformanceClientRecord record : records) {
+            ids.add(record.getId());
+            PerformanceConfirmLogData log = new PerformanceConfirmLogData();
+            log.setTaskId(record.getTaskId());
+            log.setRecordId(record.getId());
+            log.setMobile(record.getMobile());
+            log.setConfirmType(confirmType);
+            log.setPerformanceSnapshot(record.getPerformance());
+            logs.add(log);
+        }
+        employeePerformanceClientPersistencePort.batchInsertConfirmLog(logs);
+        int updatedCount = employeePerformanceClientPersistencePort.batchMarkAutoConfirmed(ids, confirmStatus);
+        increaseAutoConfirmTaskStats(records, updatedCount);
+        return updatedCount;
+    }
+
+    /**
+     * 校验短信验证码。
+     *
+     * @param smsCode 短信验证码
+     */
+    private PerformanceSmsEvidenceData verifySmsCode(String mobile, String scene, String smsCode) {
+        PerformanceSmsEvidenceData evidence = employeePerformanceClientPersistencePort.getLatestSmsEvidence(mobile, scene);
+        if (evidence == null || evidence.getId() == null) {
+            throw new BusinessException(ErrorCode.E999001, "请先获取验证码");
+        }
+        if (evidence.getVerifiedAt() != null) {
+            throw new BusinessException(ErrorCode.E999001, "验证码已使用，请重新获取");
+        }
+        int expireMinutes = performanceSmsProperties.getCodeExpireMinutes() == null ? 5 : performanceSmsProperties.getCodeExpireMinutes();
+        if (evidence.getSentAt() == null
+                || evidence.getSentAt().plusMinutes(expireMinutes).isBefore(LocalDateTime.now())) {
+            throw new BusinessException(ErrorCode.E999001, "验证码已过期，请重新获取");
+        }
+        if (!StringUtils.equals(smsCode, evidence.getSmsCode())) {
+            throw new BusinessException(ErrorCode.E999001, "验证码不正确");
+        }
+        return evidence;
+    }
+
+    /**
+     * 校验图形验证码。
+     *
+     * @param captchaVerifyParam 图形验证码参数
+     */
+    private void verifyCaptcha(String captchaVerifyParam) {
+        if (!Boolean.TRUE.equals(performanceSmsProperties.getCaptchaEnabled())) {
+            return;
+        }
+        CaptchaVerifyGatewayParam param = new CaptchaVerifyGatewayParam();
+        param.setCaptchaVerifyParam(captchaVerifyParam);
+        captchaGateway.verify(param);
+    }
+
+    /**
+     * 创建短信验证码。
+     *
+     * @return 短信验证码
+     */
+    private String createSmsCode() {
+        if (Boolean.TRUE.equals(performanceSmsProperties.getMockEnabled())) {
+            return performanceSmsProperties.getMockCode();
+        }
+        return String.valueOf((int) (Math.random() * 900000) + 100000);
+    }
+
+    /**
+     * 发送真实短信验证码。
+     *
+     * @param mobile 手机号
+     * @param code 验证码
+     */
+    private void sendRealSmsCode(String mobile, String code) {
+        SmsCodeSendGatewayParam param = new SmsCodeSendGatewayParam();
+        param.setMobile(mobile);
+        param.setCode(code);
+        smsCodeGateway.sendCode(param);
+    }
+
+    /**
+     * 要求员工绩效记录存在。
+     *
+     * @param recordId 员工绩效记录 ID
+     * @param mobile 员工手机号
+     * @return 员工绩效记录
+     */
+    private EmployeePerformanceClientRecord requireRecord(Long recordId, String mobile) {
+        if (recordId == null) {
+            throw new BusinessException(ErrorCode.E999001, "绩效记录ID不能为空");
+        }
+        EmployeePerformanceClientRecord record = employeePerformanceClientPersistencePort.getByIdAndMobile(recordId, mobile);
+        if (record == null) {
+            throw new BusinessException(ErrorCode.E999001, "绩效记录不存在");
+        }
+        return enrichTaskInfo(record);
+    }
+
+    /**
+     * 校验手机号命中绩效名单。
+     *
+     * @param mobile 员工手机号
+     */
+    private void assertMobileInPerformanceList(String mobile) {
+        if (listAllRecordsByMobile(mobile).isEmpty()) {
+            throw new BusinessException(ErrorCode.E999001, "当前手机号暂无绩效记录");
+        }
+    }
+
+    /**
+     * 按手机号查询当前可评价绩效记录。
+     *
+     * @param mobile 员工手机号
+     * @return 当前可评价绩效记录
+     */
+    private List<EmployeePerformanceClientRecord> listAvailableRecordsByMobile(String mobile) {
+        List<EmployeePerformanceClientRecord> enrichedRecords = listAllRecordsByMobile(mobile);
+        LocalDateTime now = LocalDateTime.now();
+        return enrichedRecords.stream()
+                .filter(record -> isCurrentRecord(record, now))
+                .toList();
+    }
+
+    /**
+     * 按手机号查询全部绩效记录。
+     *
+     * @param mobile 员工手机号
+     * @return 全部绩效记录
+     */
+    private List<EmployeePerformanceClientRecord> listAllRecordsByMobile(String mobile) {
+        List<EmployeePerformanceClientRecord> records = employeePerformanceClientPersistencePort.listByMobile(mobile);
+        return enrichTaskInfo(records);
+    }
+
+    /**
+     * 批量补齐绩效任务信息。
+     *
+     * @param records 员工绩效记录
+     * @return 已补齐任务信息的员工绩效记录
+     */
+    private List<EmployeePerformanceClientRecord> enrichTaskInfo(List<EmployeePerformanceClientRecord> records) {
+        if (records == null || records.isEmpty()) {
+            return List.of();
+        }
+        List<Long> taskIds = records.stream()
+                .map(EmployeePerformanceClientRecord::getTaskId)
+                .distinct()
+                .toList();
+        List<PerformanceTaskRecord> tasks = performanceTaskPersistencePort.listByIds(taskIds);
+        Map<Long, PerformanceTaskRecord> taskMap = new HashMap<>();
+        for (PerformanceTaskRecord task : tasks) {
+            taskMap.put(task.getId(), task);
+        }
+        List<EmployeePerformanceClientRecord> result = new ArrayList<>();
+        for (EmployeePerformanceClientRecord record : records) {
+            PerformanceTaskRecord task = taskMap.get(record.getTaskId());
+            if (task == null || !PerformanceTaskStatus.isOpen(task.getStatus())) {
+                continue;
+            }
+            fillTaskInfo(record, task);
+            result.add(record);
+        }
+        return result;
+    }
+
+    /**
+     * 补齐单条绩效任务信息。
+     *
+     * @param record 员工绩效记录
+     * @return 已补齐任务信息的员工绩效记录
+     */
+    private EmployeePerformanceClientRecord enrichTaskInfo(EmployeePerformanceClientRecord record) {
+        PerformanceTaskRecord task = performanceTaskPersistencePort.getById(record.getTaskId());
+        if (task == null || task.getId() == null || Integer.valueOf(1).equals(task.getIsDeleted())) {
+            throw new BusinessException(ErrorCode.E999001, "绩效任务不存在");
+        }
+        if (!PerformanceTaskStatus.isOpen(task.getStatus())) {
+            throw new BusinessException(ErrorCode.E999001, "绩效任务未开启");
+        }
+        fillTaskInfo(record, task);
+        return record;
+    }
+
+    /**
+     * 填充绩效任务信息。
+     *
+     * @param record 员工绩效记录
+     * @param task 绩效任务
+     */
+    private void fillTaskInfo(EmployeePerformanceClientRecord record, PerformanceTaskRecord task) {
+        record.setPerformanceDescription(task.getPerformanceDescription());
+        record.setPeriodStartDate(task.getPeriodStartDate());
+        record.setPeriodEndDate(task.getPeriodEndDate());
+        record.setConfirmDeadlineTime(task.getConfirmDeadlineTime());
+        record.setSecondConfirmDeadlineTime(task.getSecondConfirmDeadlineTime());
+    }
+
+    /**
+     * 校验绩效是否允许确认。
+     *
+     * @param record 员工绩效记录
+     */
+    private void assertConfirmAllowed(EmployeePerformanceClientRecord record) {
+        if (PerformanceConfirmStatus.PENDING_CONFIRM.getCode().equals(record.getConfirmStatus())) {
+            if (LocalDateTime.now().isAfter(record.getConfirmDeadlineTime())) {
+                throw new BusinessException(ErrorCode.E999001, "确认已截止");
+            }
+            return;
+        }
+        if (PerformanceConfirmStatus.PENDING_SECOND_CONFIRM.getCode().equals(record.getConfirmStatus())) {
+            if (record.getSecondConfirmDeadlineTime() != null
+                    && LocalDateTime.now().isAfter(record.getSecondConfirmDeadlineTime())) {
+                throw new BusinessException(ErrorCode.E999001, "二次确认已截止");
+            }
+            return;
+        }
+        throw new BusinessException(ErrorCode.E999001, "当前状态不允许确认");
+    }
+
+    /**
+     * 校验绩效是否允许反馈。
+     *
+     * @param record 员工绩效记录
+     */
+    private void assertFeedbackAllowed(EmployeePerformanceClientRecord record) {
+        if (!PerformanceConfirmStatus.PENDING_CONFIRM.getCode().equals(record.getConfirmStatus())
+                || !PerformanceFeedbackStatus.NONE.getCode().equals(record.getFeedbackStatus())) {
+            throw new BusinessException(ErrorCode.E999001, "当前状态不允许反馈");
+        }
+        if (LocalDateTime.now().isAfter(record.getConfirmDeadlineTime())) {
+            throw new BusinessException(ErrorCode.E999001, "反馈已截止");
+        }
+    }
+
+    /**
+     * 构建已验证短信凭证。
+     *
+     * @param mobile 手机号
+     * @param scene 短信场景
+     * @param ipAddress 请求 IP
+     * @param userAgent 浏览器 User-Agent
+     * @return 短信验证留痕写入数据
+     */
+    private PerformanceSmsEvidenceData verifiedSmsEvidence(String mobile, String scene, String ipAddress, String userAgent) {
+        LocalDateTime now = LocalDateTime.now();
+        PerformanceSmsEvidenceData data = new PerformanceSmsEvidenceData();
+        data.setMobile(mobile);
+        data.setScene(scene);
+        data.setSmsSendBizId(UUID.randomUUID().toString());
+        data.setIpAddress(ipAddress);
+        data.setUserAgent(userAgent);
+        data.setSentAt(now);
+        data.setVerifiedAt(now);
+        return data;
+    }
+
+    /**
+     * 新增确认留痕。
+     *
+     * @param command 确认命令
+     * @param record 员工绩效记录
+     * @param smsEvidence 短信验证留痕
+     */
+    private void insertConfirmLog(EmployeePerformanceConfirmCommand command,
+                                  EmployeePerformanceClientRecord record,
+                                  PerformanceSmsEvidenceData smsEvidence) {
+        PerformanceConfirmLogData data = new PerformanceConfirmLogData();
+        data.setTaskId(record.getTaskId());
+        data.setRecordId(record.getId());
+        data.setMobile(record.getMobile());
+        data.setConfirmType(confirmType(record.getConfirmStatus()));
+        data.setPerformanceSnapshot(record.getPerformance());
+        data.setSmsEvidenceId(smsEvidence.getId());
+        data.setSmsSendBizId(smsEvidence.getSmsSendBizId());
+        data.setSmsVerifiedAt(smsEvidence.getVerifiedAt());
+        data.setIpAddress(command.getIpAddress());
+        data.setUserAgent(command.getUserAgent());
+        employeePerformanceClientPersistencePort.insertConfirmLog(data);
+    }
+
+    /**
+     * 获取确认类型。
+     *
+     * @param confirmStatus 当前确认状态
+     * @return 确认类型
+     */
+    private String confirmType(String confirmStatus) {
+        if (PerformanceConfirmStatus.PENDING_SECOND_CONFIRM.getCode().equals(confirmStatus)) {
+            return "SECOND_CONFIRM";
+        }
+        return "FIRST_CONFIRM";
+    }
+
+    /**
+     * 获取确认后状态。
+     *
+     * @param confirmStatus 当前确认状态
+     * @return 确认后状态
+     */
+    private String nextConfirmStatus(String confirmStatus) {
+        if (PerformanceConfirmStatus.PENDING_SECOND_CONFIRM.getCode().equals(confirmStatus)) {
+            return PerformanceConfirmStatus.SECOND_CONFIRMED.getCode();
+        }
+        return PerformanceConfirmStatus.CONFIRMED.getCode();
+    }
+
+    /**
+     * 判断是否在反馈截止前。
+     *
+     * @param record 员工绩效记录
+     * @param now 当前时间
+     * @return 是否在反馈截止前
+     */
+    private boolean isBeforeFeedbackDeadline(EmployeePerformanceClientRecord record, LocalDateTime now) {
+        return record.getConfirmDeadlineTime() != null && now.isBefore(record.getConfirmDeadlineTime());
+    }
+
+    /**
+     * 判断是否当前可处理绩效记录。
+     *
+     * @param record 员工绩效记录
+     * @param now 当前时间
+     * @return 是否当前可处理
+     */
+    private boolean isCurrentRecord(EmployeePerformanceClientRecord record, LocalDateTime now) {
+        return isConfirmAvailable(record, now) || isFeedbackAvailable(record, now);
+    }
+
+    /**
+     * 转换员工端绩效返回对象。
+     *
+     * @param record 员工绩效记录
+     * @return 员工端绩效返回对象
+     */
+    private EmployeePerformanceClientResult toResult(EmployeePerformanceClientRecord record) {
+        EmployeePerformanceClientResult result = new EmployeePerformanceClientResult();
+        result.setId(record.getId());
+        result.setPerformanceDescription(record.getPerformanceDescription());
+        result.setPeriodText(record.getPeriodStartDate() + " 至 " + record.getPeriodEndDate());
+        result.setPerformance(record.getPerformance());
+        result.setConfirmStatus(record.getConfirmStatus());
+        result.setConfirmStatusText(confirmStatusText(record.getConfirmStatus()));
+        result.setFeedbackStatus(record.getFeedbackStatus());
+        result.setFeedbackStatusText(feedbackStatusText(record.getFeedbackStatus()));
+        result.setConfirmDeadlineTime(formatDateTime(record.getConfirmDeadlineTime()));
+        result.setSecondConfirmDeadlineTime(formatDateTime(record.getSecondConfirmDeadlineTime()));
+        result.setActionDeadlineTime(formatDateTime(actionDeadlineTime(record)));
+        LocalDateTime now = LocalDateTime.now();
+        result.setConfirmAvailable(isConfirmAvailable(record, now));
+        result.setFeedbackAvailable(isFeedbackAvailable(record, now));
+        result.setHistory(!isCurrentRecord(record, now));
+        return result;
+    }
+
+    /**
+     * 判断是否允许确认。
+     *
+     * @param record 员工绩效记录
+     * @param now 当前时间
+     * @return 是否允许确认
+     */
+    private boolean isConfirmAvailable(EmployeePerformanceClientRecord record, LocalDateTime now) {
+        if (PerformanceConfirmStatus.PENDING_CONFIRM.getCode().equals(record.getConfirmStatus())) {
+            return isBeforeFeedbackDeadline(record, now);
+        }
+        return PerformanceConfirmStatus.PENDING_SECOND_CONFIRM.getCode().equals(record.getConfirmStatus())
+                && record.getSecondConfirmDeadlineTime() != null
+                && now.isBefore(record.getSecondConfirmDeadlineTime());
+    }
+
+    /**
+     * 判断是否允许反馈。
+     *
+     * @param record 员工绩效记录
+     * @param now 当前时间
+     * @return 是否允许反馈
+     */
+    private boolean isFeedbackAvailable(EmployeePerformanceClientRecord record, LocalDateTime now) {
+        return PerformanceConfirmStatus.PENDING_CONFIRM.getCode().equals(record.getConfirmStatus())
+                && PerformanceFeedbackStatus.NONE.getCode().equals(record.getFeedbackStatus())
+                && isBeforeFeedbackDeadline(record, now);
+    }
+
+    /**
+     * 转换确认状态文案。
+     *
+     * @param status 确认状态编码
+     * @return 确认状态文案
+     */
+    private String confirmStatusText(String status) {
+        for (PerformanceConfirmStatus item : PerformanceConfirmStatus.values()) {
+            if (item.getCode().equals(status)) {
+                return item.getName();
+            }
+        }
+        return status;
+    }
+
+    /**
+     * 转换反馈状态文案。
+     *
+     * @param status 反馈状态编码
+     * @return 反馈状态文案
+     */
+    private String feedbackStatusText(String status) {
+        for (PerformanceFeedbackStatus item : PerformanceFeedbackStatus.values()) {
+            if (item.getCode().equals(status)) {
+                return item.getName();
+            }
+        }
+        return status;
+    }
+
+    /**
+     * 获取当前动作截止时间。
+     *
+     * @param record 员工绩效记录
+     * @return 当前动作截止时间
+     */
+    private LocalDateTime actionDeadlineTime(EmployeePerformanceClientRecord record) {
+        if (PerformanceConfirmStatus.PENDING_SECOND_CONFIRM.getCode().equals(record.getConfirmStatus())) {
+            return record.getSecondConfirmDeadlineTime();
+        }
+        return record.getConfirmDeadlineTime();
+    }
+
+    /**
+     * 增加自动确认任务统计。
+     *
+     * @param records 自动确认候选记录
+     * @param updatedCount 更新成功数量
+     */
+    private void increaseAutoConfirmTaskStats(List<EmployeePerformanceClientRecord> records, int updatedCount) {
+        if (updatedCount <= 0 || records == null || records.isEmpty()) {
+            return;
+        }
+        Map<Long, Integer> countMap = new HashMap<>();
+        for (int index = 0; index < Math.min(updatedCount, records.size()); index++) {
+            EmployeePerformanceClientRecord record = records.get(index);
+            countMap.merge(record.getTaskId(), 1, Integer::sum);
+        }
+        for (Map.Entry<Long, Integer> entry : countMap.entrySet()) {
+            performanceTaskPersistencePort.increaseConfirmedCount(entry.getKey(), entry.getValue());
+            performanceTaskPersistencePort.increaseAutoConfirmedCount(entry.getKey(), entry.getValue());
+        }
+    }
+
+    /**
+     * 格式化日期时间。
+     *
+     * @param dateTime 日期时间
+     * @return 日期时间文本
+     */
+    private String formatDateTime(LocalDateTime dateTime) {
+        if (dateTime == null) {
+            return "";
+        }
+        return DATE_TIME_FORMATTER.format(dateTime);
+    }
+}

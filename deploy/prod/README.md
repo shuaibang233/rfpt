@@ -22,7 +22,7 @@
 前端流水线还需要配置：
 
 - `CDN_BASE_URL`：当前前端应用的完整 CDN 前缀，例如 `https://cdn.zcglhr.com/rf-mng-node/`、`https://cdn.zcglhr.com/rf-h5/`。
-- `API_BASE_URL`：当前前端应用访问后端 API 的根地址，例如管理端 `https://mng.zcglhr.com`；如果走同域 Nginx 代理，可以配置为 `/api`。
+- `API_BASE_URL`：当前前端应用访问后端 API 的根地址，例如管理端 `https://mng.zcglhr.com`；H5 默认留空，直接请求同域 `/performance/*`，由外层网关转发到 `rf-performance`。
 - `OSS_ENDPOINT`：OSS endpoint。
 - `OSS_BUCKET`：静态资源 bucket。
 - `OSS_ACCESS_KEY_ID`：OSS 访问密钥 ID。
@@ -76,9 +76,9 @@ kubectl -n prod get deploy rf-mng rf-performance -o yaml | grep -n "rf-platform-
 ## 路由建议
 
 - 管理端前端 `rf-mng-node` 暴露给后台域名。
-- 员工端 H5 `rf-h5-node` 暴露给公众号菜单域名或路径。
+- 员工端 H5 `rf-h5-node` 由外层网关按 `/h5/*` 路由到前端服务，当前绩效页面为 `/h5/performance`。
 - `rf-mng-node` 的 `/api/`、`/mng/` 代理到 `rf-mng`。
-- `rf-h5-node` 的 `/api/performance/h5/` 代理到 `rf-performance`。
+- `/performance/*` 由外层网关代理到 `rf-performance`，员工端接口使用 `/performance/employee/*`，不在 `rf-h5-node` Nginx 内反代。
 
 ## 注意事项
 

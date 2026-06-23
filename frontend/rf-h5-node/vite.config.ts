@@ -18,7 +18,7 @@ export default defineConfig(({ mode }) => {
       host: '0.0.0.0',
       port: 18094,
       proxy: {
-        '/api': {
+        '/performance': {
           target: env.VITE_API_PROXY_TARGET || 'http://127.0.0.1:18093',
           changeOrigin: true,
         },

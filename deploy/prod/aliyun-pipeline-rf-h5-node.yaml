@@ -112,7 +112,7 @@ stages:
                 print_commit_summary || true
 
                 echo "检查变量"
-                for name in API_BASE_URL CDN_BASE_URL OSS_ENDPOINT OSS_BUCKET OSS_ACCESS_KEY_ID OSS_ACCESS_KEY_SECRET CR_USER_NAME CR_PWD NGINX_IMAGE; do
+                for name in CDN_BASE_URL OSS_ENDPOINT OSS_BUCKET OSS_ACCESS_KEY_ID OSS_ACCESS_KEY_SECRET CR_USER_NAME CR_PWD NGINX_IMAGE; do
                   if [ -z "$(eval echo \$$name)" ]; then
                     echo "$name 未配置"
                     exit 1
@@ -127,7 +127,7 @@ stages:
                 OSS_PREFIX="${APP_CDN_NAME}/"
                 OSS_ASSETS_PATH="oss://${OSS_BUCKET}/${OSS_PREFIX}assets"
                 export CDN_BASE_URL
-                export API_BASE_URL
+                export API_BASE_URL="${API_BASE_URL:-}"
 
                 echo "H5 静态资源配置"
                 echo "API_BASE_URL=$API_BASE_URL"
