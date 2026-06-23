@@ -12,7 +12,6 @@
         <result property="periodMonth" column="settle_month"/>
         <result property="status" column="task_status"/>
         <result property="payableAmount" column="tax_total_amount"/>
-        <result property="errorCode" column="error_code"/>
         <result property="errorMessage" column="error_message"/>
         <result property="retryable" column="retryable"/>
         <result property="retryCount" column="retry_count"/>
@@ -22,7 +21,7 @@
         <result property="heartbeatAt" column="heartbeat_at"/>
         <result property="startedAt" column="started_at"/>
         <result property="finishedAt" column="finished_at"/>
-        <result property="resultPayload" column="result_payload"/>
+        <result property="resultPayload" column="result_body"/>
         <result property="createAdminId" column="create_admin_id"/>
         <result property="createAdminName" column="create_admin_name"/>
         <result property="gmtCreate" column="gmt_create"/>
@@ -72,7 +71,7 @@
         UPDATE tb_tax_social_security_payment_task
         SET task_status = 'PENDING', retryable = 0, retry_count = retry_count + 1,
             worker_id = NULL, claimed_at = NULL, heartbeat_at = NULL, started_at = NULL, finished_at = NULL,
-            error_code = NULL, error_message = NULL, result_payload = NULL
+            error_message = NULL, result_body = NULL
         WHERE id = #{id}
     </update>
 

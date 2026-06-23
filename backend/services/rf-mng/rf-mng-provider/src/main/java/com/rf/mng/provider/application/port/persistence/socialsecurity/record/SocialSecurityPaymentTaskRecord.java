@@ -57,7 +57,7 @@ public class SocialSecurityPaymentTaskRecord implements Serializable {
     private LocalDateTime startedAt;
     /** 机器人完成时间。 */
     private LocalDateTime finishedAt;
-    /** 机器人回写结果明细。 */
+    /** 机器人回写任务结果，对应 result_body。 */
     private String resultPayload;
     /** 创建管理员ID。 */
     private Long createAdminId;

@@ -101,4 +101,4 @@ kubectl -n prod get deploy rf-mng rf-performance -o yaml | grep -n "rf-platform-
 - XXL-JOB 需要在调度中心配置执行器 `rf-performance`，并添加任务 handler：`employeePerformanceAutoConfirmJob`。
 - 数据库拆分为 `rf_pt` 和 `rf_robot`：平台业务表放入 `rf_pt`，tax-browser-worker 与 rf-mng 通过 `rf_robot` 税务机器人表交互，管理端不直连内网机器人服务。
 - 生产上线前需要在 `rf_pt` 执行 `backend/services/rf-mng/sql/rf_pt/20260622_platform_admin.sql`、`backend/services/rf-performance/sql/20260621_employee_performance.sql` 和 `backend/services/rf-mng/sql/rf_pt/20260615_social_security_payment_management.sql`。
-- 生产上线前需要在 `rf_robot` 执行 qy_robot 税务机器人基础表结构；社保协作队列字段和索引由 rf-mng 启动时 Java 初始化逻辑自动补齐。如需关闭自动补齐，再人工执行无存储过程兜底脚本 `backend/services/rf-mng/sql/rf_robot/20260623_social_security_payment_task_queue.sql`。
+- 生产上线前需要在 `rf_robot` 执行 qy_robot 税务机器人基础表结构；社保协作队列字段和索引由 rf-mng 启动时 Java 初始化逻辑自动补齐。如需关闭自动补齐，再执行普通 DDL 脚本 `backend/services/rf-mng/sql/rf_robot/20260623_social_security_payment_task_queue.sql`。

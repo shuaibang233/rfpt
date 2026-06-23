@@ -143,10 +143,7 @@ public class SocialSecurityRobotSchemaInitializer implements ApplicationRunner {
                 new ColumnDefinition("site_type", "`site_type` varchar(32) NOT NULL DEFAULT 'default' COMMENT '站点类型' AFTER `region_code`"),
                 new ColumnDefinition("worker_id", "`worker_id` varchar(64) DEFAULT NULL COMMENT '领取任务的机器人编号' AFTER `max_retry_count`"),
                 new ColumnDefinition("claimed_at", "`claimed_at` datetime DEFAULT NULL COMMENT '机器人领取时间' AFTER `worker_id`"),
-                new ColumnDefinition("heartbeat_at", "`heartbeat_at` datetime DEFAULT NULL COMMENT '机器人心跳时间' AFTER `claimed_at`"),
-                new ColumnDefinition("started_at", "`started_at` datetime DEFAULT NULL COMMENT '机器人开始执行时间' AFTER `heartbeat_at`"),
-                new ColumnDefinition("finished_at", "`finished_at` datetime DEFAULT NULL COMMENT '机器人完成时间' AFTER `started_at`"),
-                new ColumnDefinition("result_payload", "`result_payload` json DEFAULT NULL COMMENT '机器人回写结果明细' AFTER `finished_at`")
+                new ColumnDefinition("heartbeat_at", "`heartbeat_at` datetime DEFAULT NULL COMMENT '机器人心跳时间' AFTER `claimed_at`")
         );
     }
 
@@ -158,8 +155,7 @@ public class SocialSecurityRobotSchemaInitializer implements ApplicationRunner {
     private List<IndexDefinition> robotQueueIndexes() {
         return List.of(
                 new IndexDefinition("idx_task_status_id", "ADD INDEX `idx_task_status_id` (`task_status`, `id`)"),
-                new IndexDefinition("idx_worker_status", "ADD INDEX `idx_worker_status` (`worker_id`, `task_status`)"),
-                new IndexDefinition("idx_batch_status", "ADD INDEX `idx_batch_status` (`batch_id`, `task_status`)")
+                new IndexDefinition("idx_worker_status", "ADD INDEX `idx_worker_status` (`worker_id`, `task_status`)")
         );
     }
 
