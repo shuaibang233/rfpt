@@ -210,6 +210,22 @@ export function PerformanceHomePage() {
   };
 
   const login = async () => {
+    if (!/^1\d{10}$/.test(mobile)) {
+      Toast.show({ icon: 'fail', content: '请输入正确的手机号' });
+      return;
+    }
+    if (mobileCheckStatus === 'checking') {
+      Toast.show({ icon: 'fail', content: '正在查询待确认绩效，请稍后' });
+      return;
+    }
+    if (mobileCheckStatus !== 'passed') {
+      Toast.show({ icon: 'fail', content: mobileCheckMessage || '当前手机号没有待确认的绩效' });
+      return;
+    }
+    if (!/^\d{6}$/.test(smsCode)) {
+      Toast.show({ icon: 'fail', content: '请输入6位短信验证码' });
+      return;
+    }
     setLoading(true);
     try {
       const result = await performanceApi.login({ mobile, smsCode });
@@ -244,6 +260,7 @@ export function PerformanceHomePage() {
 
   if (!loginMobile) {
     const smsButtonDisabled = !/^1\d{10}$/.test(mobile) || mobileCheckStatus !== 'passed' || (!captchaReady && !captchaInitError);
+    const loginButtonDisabled = loading || mobileCheckStatus !== 'passed' || !/^\d{6}$/.test(smsCode);
     return (
       <div className="page-shell">
         <main className="content">
@@ -256,7 +273,7 @@ export function PerformanceHomePage() {
               </div>
             </div>
             <Form layout="vertical" footer={
-              <Button block color="primary" loading={loading} onClick={login}>
+              <Button block color="primary" loading={loading} disabled={loginButtonDisabled} onClick={login}>
                 登录
               </Button>
             }>
