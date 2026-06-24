@@ -463,7 +463,6 @@ function App() {
 
   const performanceImportColumns: ColumnsType<EmployeePerformanceImportUpload> = useMemo(() => [
     { title: '上传时间', dataIndex: 'gmtCreate', width: 170, render: (value) => formatDateTime(value) },
-    { title: '绩效任务', dataIndex: 'taskName', width: 240, ellipsis: true, render: (value, row) => value || String(row.taskId) },
     { title: '原始文件', dataIndex: 'fileName', width: 220, ellipsis: true },
     {
       title: '状态',
@@ -876,6 +875,7 @@ function App() {
                           </Form>
                           <Table
                             rowKey="id"
+                            className="performance-task-table"
                             loading={performanceTaskLoading}
                             columns={performanceTaskColumns}
                             dataSource={performanceTaskList}

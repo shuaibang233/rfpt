@@ -188,7 +188,7 @@ public class PerformanceTaskManagerImpl implements PerformanceTaskManager {
      */
     private PerformanceTaskData toData(PerformanceTaskCreateCommand command) {
         PerformanceTaskData data = BeanUtil.copyProperties(command, PerformanceTaskData.class);
-        data.setStatus(PerformanceTaskStatus.CLOSED.getCode());
+        data.setStatus(PerformanceTaskStatus.OPEN.getCode());
         return data;
     }
 
