@@ -23,7 +23,6 @@ import type { ColumnsType } from 'antd/es/table';
 import type { MenuProps } from 'antd';
 import dayjs from 'dayjs';
 import { useEffect, useMemo, useState } from 'react';
-import type { ReactNode } from 'react';
 import companyLogo from './assets/company-logo.svg';
 import {
   AdminSaveParam,
@@ -33,10 +32,14 @@ import {
   EmployeePerformanceRecord,
   LoginUser,
   PerformanceTask,
+  SocialSecurityEnterprise,
+  SocialSecurityRegionSite,
   TaskRecord,
   adjustPerformanceRecord,
   createBatch,
   createPerformanceTask,
+  deleteSocialSecurityEnterprise,
+  deleteSocialSecurityRegionSite,
   deletePerformanceTask,
   disablePerformanceTask,
   deleteAdmin,
@@ -48,6 +51,8 @@ import {
   fetchPerformanceImportUploads,
   fetchPerformanceRecords,
   fetchPerformanceTasks,
+  fetchSocialSecurityEnterprises,
+  fetchSocialSecurityRegionSites,
   fetchTasks,
   generateAdminTotp,
   getRequestErrorMessage,
@@ -59,6 +64,8 @@ import {
   performanceImportOriginalDownloadUrl,
   retryTask,
   saveAdmin,
+  saveSocialSecurityEnterprise,
+  saveSocialSecurityRegionSite,
   updateAdmin,
 } from './api';
 
@@ -69,7 +76,12 @@ const statusColor: Record<string, string> = {
   SUBMITTED: 'processing',
   RUNNING: 'processing',
   PROCESSING: 'processing',
+  MATCHED: 'success',
+  MISMATCHED: 'error',
+  SKIPPED: 'default',
   SUCCESS: 'success',
+  ISSUED: 'processing',
+  DOWNLOADED: 'success',
   PARTIAL_SUCCESS: 'warning',
   FAILED: 'error',
   PENDING: 'default',
@@ -133,6 +145,23 @@ const performanceTaskStatusOptions = [
   { value: 'CLOSED', label: '关闭' },
 ];
 
+const statusOptions = [
+  { value: 'active', label: '启用' },
+  { value: 'disabled', label: '停用' },
+];
+
+const stageStatusText: Record<string, string> = {
+  PENDING: '待处理',
+  PROCESSING: '处理中',
+  MATCHED: '一致',
+  MISMATCHED: '不一致',
+  SKIPPED: '跳过',
+  SUCCESS: '成功',
+  FAILED: '失败',
+  ISSUED: '已开具',
+  DOWNLOADED: '已下载',
+};
+
 const performanceImportTemplateUrl = 'https://static.zcglhr.com/qy-mng/upload-task/%E5%91%98%E5%B7%A5%E7%BB%A9%E6%95%88%E5%AF%BC%E5%85%A5%E6%A8%A1%E6%9D%BF-20260624.xlsx';
 
 const adminRoleOptions = [
@@ -158,12 +187,16 @@ function App() {
   const [pageKey, setPageKey] = useState<PageKey>(() => getPageKeyByPath(window.location.pathname));
   const [batchList, setBatchList] = useState<BatchRecord[]>([]);
   const [taskList, setTaskList] = useState<TaskRecord[]>([]);
+  const [enterpriseList, setEnterpriseList] = useState<SocialSecurityEnterprise[]>([]);
+  const [regionSiteList, setRegionSiteList] = useState<SocialSecurityRegionSite[]>([]);
   const [performanceTaskList, setPerformanceTaskList] = useState<PerformanceTask[]>([]);
   const [performanceList, setPerformanceList] = useState<EmployeePerformanceRecord[]>([]);
   const [performanceImportUploads, setPerformanceImportUploads] = useState<EmployeePerformanceImportUpload[]>([]);
   const [adminList, setAdminList] = useState<AdminUser[]>([]);
   const [batchLoading, setBatchLoading] = useState(false);
   const [taskLoading, setTaskLoading] = useState(false);
+  const [enterpriseLoading, setEnterpriseLoading] = useState(false);
+  const [regionSiteLoading, setRegionSiteLoading] = useState(false);
   const [performanceTaskLoading, setPerformanceTaskLoading] = useState(false);
   const [performanceLoading, setPerformanceLoading] = useState(false);
   const [importUploadLoading, setImportUploadLoading] = useState(false);
@@ -171,19 +204,29 @@ function App() {
   const [performanceTaskPage, setPerformanceTaskPage] = useState({ page: 1, size: 10, total: 0 });
   const [performanceRecordPage, setPerformanceRecordPage] = useState({ page: 1, size: 50, total: 0 });
   const [adminPage, setAdminPage] = useState({ page: 1, size: 10, total: 0 });
+  const [enterprisePage, setEnterprisePage] = useState({ page: 1, size: 10, total: 0 });
+  const [regionSitePage, setRegionSitePage] = useState({ page: 1, size: 10, total: 0 });
   const [createOpen, setCreateOpen] = useState(false);
+  const [enterpriseOpen, setEnterpriseOpen] = useState(false);
+  const [regionSiteOpen, setRegionSiteOpen] = useState(false);
   const [performanceTaskOpen, setPerformanceTaskOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [importUploading, setImportUploading] = useState(false);
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [socialTaskDetailOpen, setSocialTaskDetailOpen] = useState(false);
   const [performanceTabKey, setPerformanceTabKey] = useState('performanceTasks');
   const [adminOpen, setAdminOpen] = useState(false);
   const [adminTotpOpen, setAdminTotpOpen] = useState(false);
   const [currentRecord, setCurrentRecord] = useState<EmployeePerformanceRecord | null>(null);
+  const [currentSocialTask, setCurrentSocialTask] = useState<TaskRecord | null>(null);
   const [editingAdmin, setEditingAdmin] = useState<AdminUser | null>(null);
+  const [editingEnterprise, setEditingEnterprise] = useState<SocialSecurityEnterprise | null>(null);
+  const [editingRegionSite, setEditingRegionSite] = useState<SocialSecurityRegionSite | null>(null);
   const [adminTotp, setAdminTotp] = useState<{ secret: string; qrCodeUri: string; username: string } | null>(null);
   const [form] = Form.useForm();
+  const [enterpriseForm] = Form.useForm();
+  const [regionSiteForm] = Form.useForm();
   const [performanceTaskForm] = Form.useForm();
   const [importForm] = Form.useForm();
   const [adjustForm] = Form.useForm();
@@ -192,6 +235,8 @@ function App() {
   const [performanceQueryForm] = Form.useForm();
   const [performanceTaskQueryForm] = Form.useForm();
   const [adminQueryForm] = Form.useForm();
+  const [enterpriseQueryForm] = Form.useForm();
+  const [regionSiteQueryForm] = Form.useForm();
   const confirmDeadlineTime = Form.useWatch('confirmDeadlineTime', performanceTaskForm);
   const importTaskId = Form.useWatch('taskId', importForm);
   const secondConfirmDeadlineText = useMemo(() => {
@@ -228,6 +273,38 @@ function App() {
       setTaskList(data.list || []);
     } finally {
       setTaskLoading(false);
+    }
+  };
+
+  const loadEnterprises = async (page = enterprisePage.page, size = enterprisePage.size) => {
+    setEnterpriseLoading(true);
+    try {
+      const values = enterpriseQueryForm.getFieldsValue();
+      const data = await fetchSocialSecurityEnterprises({ page, size, ...trimObject(values) });
+      setEnterpriseList(data.list || []);
+      setEnterprisePage({
+        page: data.pagination?.page || page,
+        size: data.pagination?.size || size,
+        total: data.pagination?.total || 0,
+      });
+    } finally {
+      setEnterpriseLoading(false);
+    }
+  };
+
+  const loadRegionSites = async (page = regionSitePage.page, size = regionSitePage.size) => {
+    setRegionSiteLoading(true);
+    try {
+      const values = regionSiteQueryForm.getFieldsValue();
+      const data = await fetchSocialSecurityRegionSites({ page, size, ...trimObject(values) });
+      setRegionSiteList(data.list || []);
+      setRegionSitePage({
+        page: data.pagination?.page || page,
+        size: data.pagination?.size || size,
+        total: data.pagination?.total || 0,
+      });
+    } finally {
+      setRegionSiteLoading(false);
     }
   };
 
@@ -310,6 +387,8 @@ function App() {
     if (canAccessModule(loginUser, 'social')) {
       void loadBatches();
       void loadTasks();
+      void loadEnterprises(1, 10);
+      void loadRegionSites(1, 10);
     }
     if (canAccessModule(loginUser, 'performance')) {
       void loadPerformanceTasks(1, 10);
@@ -354,24 +433,77 @@ function App() {
     { title: '地区', dataIndex: 'regionCode', width: 110 },
     { title: '月份', dataIndex: 'periodMonth', width: 110 },
     { title: '状态', dataIndex: 'status', width: 140, render: (value) => <Tag color={statusColor[value] || 'default'}>{socialTaskStatusText[value] || value}</Tag> },
+    { title: '比对', dataIndex: 'compareStatus', width: 100, render: renderStageTag },
+    { title: '缴费', dataIndex: 'paymentStatus', width: 100, render: renderStageTag },
+    { title: '凭证', dataIndex: 'certificateStatus', width: 100, render: renderStageTag },
+    { title: 'BMS', dataIndex: 'bmsFeedbackStatus', width: 100, render: renderStageTag },
     { title: '机器人', dataIndex: 'workerId', width: 120, render: (value) => value || '-' },
-    { title: '金额', dataIndex: 'payableAmount', width: 120 },
+    { title: '金额', width: 160, render: (_, row) => `${row.wpmTotalAmount ?? '-'} / ${row.payableAmount ?? '-'}` },
     { title: '失败原因', dataIndex: 'errorMessage', ellipsis: true },
     {
-      title: '操作', width: 110, fixed: 'right', render: (_, row) => (
-        <Button
-          size="small"
-          icon={<RetweetOutlined />}
-          disabled={!row.retryable}
-          onClick={async () => {
-            await retryTask(row.id);
-            message.success('已发起重试');
-            await loadTasks();
-          }}
-        >重试</Button>
+      title: '操作', width: 170, fixed: 'right', render: (_, row) => (
+        <Space>
+          <Button size="small" icon={<EyeOutlined />} onClick={() => openSocialTaskDetail(row)}>详情</Button>
+          <Button
+            size="small"
+            icon={<RetweetOutlined />}
+            disabled={!row.retryable}
+            onClick={async () => {
+              await retryTask(row.id);
+              message.success('已发起重试');
+              await loadTasks();
+            }}
+          >重试</Button>
+        </Space>
       ),
     },
   ], []);
+
+  const enterpriseColumns: ColumnsType<SocialSecurityEnterprise> = useMemo(() => [
+    { title: 'ID', dataIndex: 'id', width: 80 },
+    { title: '税号', dataIndex: 'taxNo', width: 190 },
+    { title: '企业名称', dataIndex: 'enterpriseName', width: 240, ellipsis: true },
+    { title: '地区', dataIndex: 'regionCode', width: 110 },
+    { title: '社保账号', dataIndex: 'securityAccountName', width: 200, ellipsis: true, render: (value) => value || '-' },
+    { title: '状态', dataIndex: 'status', width: 100, render: (value) => <Tag color={value === 'active' ? 'success' : 'default'}>{value === 'active' ? '启用' : '停用'}</Tag> },
+    { title: '备注', dataIndex: 'remark', ellipsis: true, render: (value) => value || '-' },
+    {
+      title: '操作',
+      width: 140,
+      fixed: 'right',
+      render: (_, row) => (
+        <Space>
+          <Button size="small" icon={<EditOutlined />} onClick={() => openEnterpriseEdit(row)}>编辑</Button>
+          <Popconfirm title="确定删除该企业？" onConfirm={() => removeEnterprise(row)}>
+            <Button size="small" danger icon={<DeleteOutlined />} />
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ], [enterprisePage.page, enterprisePage.size]);
+
+  const regionSiteColumns: ColumnsType<SocialSecurityRegionSite> = useMemo(() => [
+    { title: 'ID', dataIndex: 'id', width: 80 },
+    { title: '地区', dataIndex: 'regionCode', width: 110 },
+    { title: '站点类型', dataIndex: 'siteType', width: 120 },
+    { title: '入口地址', dataIndex: 'etaxEntryUrl', width: 260, ellipsis: true },
+    { title: '登录按钮', dataIndex: 'loginButtonText', width: 110, render: (value) => value || '登录' },
+    { title: '状态', dataIndex: 'status', width: 100, render: (value) => <Tag color={value === 'active' ? 'success' : 'default'}>{value === 'active' ? '启用' : '停用'}</Tag> },
+    { title: '备注', dataIndex: 'remark', ellipsis: true, render: (value) => value || '-' },
+    {
+      title: '操作',
+      width: 140,
+      fixed: 'right',
+      render: (_, row) => (
+        <Space>
+          <Button size="small" icon={<EditOutlined />} onClick={() => openRegionSiteEdit(row)}>编辑</Button>
+          <Popconfirm title="确定删除该地区站点？" onConfirm={() => removeRegionSite(row)}>
+            <Button size="small" danger icon={<DeleteOutlined />} />
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ], [regionSitePage.page, regionSitePage.size]);
 
   const performanceColumns: ColumnsType<EmployeePerformanceRecord> = useMemo(() => [
     { title: '绩效任务', dataIndex: 'performanceDescription', width: 160, ellipsis: true },
@@ -423,45 +555,54 @@ function App() {
       title: '操作',
       width: 330,
       fixed: 'right',
-      render: (_, row) => (
-        <Space className="table-action-group" wrap>
-          <Popconfirm
-            title={isPerformanceTaskOpen(row.statusCode) ? '确定停用该绩效任务？' : '确定启用该绩效任务？'}
-            description={isPerformanceTaskOpen(row.statusCode) ? '停用后员工端将不可查看该任务。' : '启用后员工端可查看并确认该任务。'}
-            onConfirm={() => void togglePerformanceTaskEnabled(row)}
-          >
-            <Button size="small" type={isPerformanceTaskOpen(row.statusCode) ? 'default' : 'primary'}>
-              {isPerformanceTaskOpen(row.statusCode) ? '停用' : '启用'}
+      render: (_, row) => {
+        const deleteBlockedReason = getPerformanceTaskDeleteBlockedReason(row);
+        return (
+          <Space className="table-action-group" wrap>
+            <Popconfirm
+              title={isPerformanceTaskOpen(row.statusCode) ? '确定停用该绩效任务？' : '确定启用该绩效任务？'}
+              description={isPerformanceTaskOpen(row.statusCode) ? '停用后员工端将不可查看该任务。' : '启用后员工端可查看并确认该任务。'}
+              onConfirm={() => void togglePerformanceTaskEnabled(row)}
+            >
+              <Button size="small" type={isPerformanceTaskOpen(row.statusCode) ? 'default' : 'primary'}>
+                {isPerformanceTaskOpen(row.statusCode) ? '停用' : '启用'}
+              </Button>
+            </Popconfirm>
+            <Button
+              size="small"
+              type="primary"
+              ghost
+              icon={<EyeOutlined />}
+              onClick={() => {
+                performanceQueryForm.setFieldValue('taskId', row.id);
+                setPerformanceTabKey('performanceRecords');
+                void loadPerformanceRecords(1, performanceRecordPage.size, { taskId: row.id });
+              }}
+            >
+              员工记录
             </Button>
-          </Popconfirm>
-          <Button
-            size="small"
-            type="primary"
-            ghost
-            icon={<EyeOutlined />}
-            onClick={() => {
-              performanceQueryForm.setFieldValue('taskId', row.id);
-              setPerformanceTabKey('performanceRecords');
-              void loadPerformanceRecords(1, performanceRecordPage.size, { taskId: row.id });
-            }}
-          >
-            员工记录
-          </Button>
-          <Button
-            size="small"
-            icon={<UploadOutlined />}
-            onClick={() => {
-              importForm.setFieldValue('taskId', row.id);
-              setImportOpen(true);
-            }}
-          >
-            导入
-          </Button>
-          <Popconfirm title="确定删除该绩效任务？" description="仅支持删除未导入员工记录的关闭任务。" onConfirm={() => void removePerformanceTask(row)}>
-            <Button size="small" danger icon={<DeleteOutlined />}>删除</Button>
-          </Popconfirm>
-        </Space>
-      ),
+            <Button
+              size="small"
+              icon={<UploadOutlined />}
+              onClick={() => {
+                importForm.setFieldValue('taskId', row.id);
+                setImportOpen(true);
+              }}
+            >
+              导入
+            </Button>
+            <Button
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+              title={deleteBlockedReason || '删除绩效任务'}
+              onClick={() => requestDeletePerformanceTask(row, deleteBlockedReason)}
+            >
+              删除
+            </Button>
+          </Space>
+        );
+      },
     },
   ], [importForm, performanceQueryForm, performanceRecordPage.size, performanceTaskPage.page, performanceTaskPage.size]);
 
@@ -546,7 +687,7 @@ function App() {
       regionCode: values.regionCode,
       siteType: 'default',
       periodMonth: values.periodMonth,
-      taxNoList: values.taxNoText.split(/\s|,|，/).map((item: string) => item.trim()).filter(Boolean),
+      taxNoList: (values.taxNoText || '').split(/\s|,|，/).map((item: string) => item.trim()).filter(Boolean),
       createAdminId: loginUser?.id,
       createAdminName: values.createAdminName || currentAdminName(loginUser),
     });
@@ -574,12 +715,31 @@ function App() {
   };
 
   const removePerformanceTask = async (task: PerformanceTask) => {
-    await deletePerformanceTask(task.id);
-    message.success('绩效任务已删除');
-    if (performanceQueryForm.getFieldValue('taskId') === task.id) {
-      performanceQueryForm.setFieldValue('taskId', undefined);
+    try {
+      await deletePerformanceTask(task.id);
+      message.success('绩效任务已删除');
+      if (performanceQueryForm.getFieldValue('taskId') === task.id) {
+        performanceQueryForm.setFieldValue('taskId', undefined);
+      }
+      await Promise.all([loadPerformanceTasks(1, performanceTaskPage.size), loadPerformanceRecords(1, performanceRecordPage.size)]);
+    } catch (error) {
+      message.error(getRequestErrorMessage(error, '绩效任务删除失败'));
     }
-    await Promise.all([loadPerformanceTasks(1, performanceTaskPage.size), loadPerformanceRecords(1, performanceRecordPage.size)]);
+  };
+
+  const requestDeletePerformanceTask = (task: PerformanceTask, blockedReason = getPerformanceTaskDeleteBlockedReason(task)) => {
+    if (blockedReason) {
+      message.warning(blockedReason);
+      return;
+    }
+    Modal.confirm({
+      title: '确定删除该绩效任务？',
+      content: '删除后任务列表将不再展示该绩效任务。',
+      okText: '删除',
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      onOk: () => removePerformanceTask(task),
+    });
   };
 
   const togglePerformanceTaskEnabled = async (task: PerformanceTask) => {
@@ -625,6 +785,11 @@ function App() {
   const openFeedback = (record: EmployeePerformanceRecord) => {
     setCurrentRecord(record);
     setFeedbackOpen(true);
+  };
+
+  const openSocialTaskDetail = (task: TaskRecord) => {
+    setCurrentSocialTask(task);
+    setSocialTaskDetailOpen(true);
   };
 
   const openAdjust = (record: EmployeePerformanceRecord) => {
@@ -675,6 +840,62 @@ function App() {
         await loadPerformanceRecords(performanceRecordPage.page, performanceRecordPage.size);
       },
     });
+  };
+
+  const openEnterpriseCreate = () => {
+    setEditingEnterprise(null);
+    enterpriseForm.resetFields();
+    enterpriseForm.setFieldsValue({ regionCode: 'liaoning', status: 'active' });
+    setEnterpriseOpen(true);
+  };
+
+  const openEnterpriseEdit = (enterprise: SocialSecurityEnterprise) => {
+    setEditingEnterprise(enterprise);
+    enterpriseForm.setFieldsValue(enterprise);
+    setEnterpriseOpen(true);
+  };
+
+  const submitEnterprise = async () => {
+    const values = await enterpriseForm.validateFields();
+    await saveSocialSecurityEnterprise({ ...values, id: editingEnterprise?.id });
+    message.success(editingEnterprise ? '企业已更新' : '企业已新增');
+    setEnterpriseOpen(false);
+    enterpriseForm.resetFields();
+    await loadEnterprises(enterprisePage.page, enterprisePage.size);
+  };
+
+  const removeEnterprise = async (enterprise: SocialSecurityEnterprise) => {
+    await deleteSocialSecurityEnterprise(enterprise.id);
+    message.success('企业已删除');
+    await loadEnterprises(enterprisePage.page, enterprisePage.size);
+  };
+
+  const openRegionSiteCreate = () => {
+    setEditingRegionSite(null);
+    regionSiteForm.resetFields();
+    regionSiteForm.setFieldsValue({ regionCode: 'liaoning', siteType: 'default', loginButtonText: '登录', status: 'active' });
+    setRegionSiteOpen(true);
+  };
+
+  const openRegionSiteEdit = (regionSite: SocialSecurityRegionSite) => {
+    setEditingRegionSite(regionSite);
+    regionSiteForm.setFieldsValue(regionSite);
+    setRegionSiteOpen(true);
+  };
+
+  const submitRegionSite = async () => {
+    const values = await regionSiteForm.validateFields();
+    await saveSocialSecurityRegionSite({ ...values, id: editingRegionSite?.id });
+    message.success(editingRegionSite ? '地区站点已更新' : '地区站点已新增');
+    setRegionSiteOpen(false);
+    regionSiteForm.resetFields();
+    await loadRegionSites(regionSitePage.page, regionSitePage.size);
+  };
+
+  const removeRegionSite = async (regionSite: SocialSecurityRegionSite) => {
+    await deleteSocialSecurityRegionSite(regionSite.id);
+    message.success('地区站点已删除');
+    await loadRegionSites(regionSitePage.page, regionSitePage.size);
   };
 
   const openAdminCreate = () => {
@@ -753,7 +974,9 @@ function App() {
       return loadAdmins(adminPage.page, adminPage.size);
     }
     if (pageKey === 'enterprise' || pageKey === 'region') {
-      return Promise.resolve();
+      return pageKey === 'enterprise'
+        ? loadEnterprises(enterprisePage.page, enterprisePage.size)
+        : loadRegionSites(regionSitePage.page, regionSitePage.size);
     }
     return Promise.all([loadBatches(), loadTasks()]);
   };
@@ -1014,12 +1237,81 @@ function App() {
               title={pageMeta.title}
               extra={<Button icon={<ReloadOutlined />} onClick={refreshCurrentModule}>刷新</Button>}
             >
-              <Table rowKey="id" loading={taskLoading} columns={taskColumns} dataSource={taskList} pagination={false} size="small" scroll={{ x: 1300 }} />
+              <Table rowKey="id" loading={taskLoading} columns={taskColumns} dataSource={taskList} pagination={false} size="small" scroll={{ x: 1800 }} />
             </Card>
           ) : pageKey === 'enterprise' ? (
-            <ConfigPlaceholder icon={<BankOutlined />} title="企业维护" description="企业维护属于社保缴费模块，后续可在这里接入企业、税号和社保账号维护能力。" />
+            <Card
+              size="small"
+              title={pageMeta.title}
+              extra={(
+                <Space>
+                  <Button icon={<ReloadOutlined />} onClick={refreshCurrentModule}>刷新</Button>
+                  <Button type="primary" icon={<PlusOutlined />} onClick={openEnterpriseCreate}>新增企业</Button>
+                </Space>
+              )}
+            >
+              <Space direction="vertical" size={12} className="full-width">
+                <Form layout="inline" form={enterpriseQueryForm} className="query-bar">
+                  <Form.Item name="taxNo" label="税号"><Input placeholder="税号" allowClear /></Form.Item>
+                  <Form.Item name="enterpriseName" label="企业"><Input placeholder="企业名称" allowClear /></Form.Item>
+                  <Form.Item name="regionCode" label="地区"><Input placeholder="地区编码" allowClear /></Form.Item>
+                  <Form.Item name="status" label="状态">
+                    <Select allowClear placeholder="全部" style={{ width: 120 }} options={statusOptions} />
+                  </Form.Item>
+                  <Button type="primary" onClick={() => loadEnterprises(1, enterprisePage.size)}>查询</Button>
+                </Form>
+                <Table
+                  rowKey="id"
+                  loading={enterpriseLoading}
+                  columns={enterpriseColumns}
+                  dataSource={enterpriseList}
+                  size="small"
+                  scroll={{ x: 1200 }}
+                  pagination={{
+                    current: enterprisePage.page,
+                    pageSize: enterprisePage.size,
+                    total: enterprisePage.total,
+                    onChange: loadEnterprises,
+                  }}
+                />
+              </Space>
+            </Card>
           ) : (
-            <ConfigPlaceholder icon={<EnvironmentOutlined />} title="地区配置" description="地区配置属于社保缴费模块，后续可在这里维护地区编码、站点类型和机器人执行参数。" />
+            <Card
+              size="small"
+              title={pageMeta.title}
+              extra={(
+                <Space>
+                  <Button icon={<ReloadOutlined />} onClick={refreshCurrentModule}>刷新</Button>
+                  <Button type="primary" icon={<PlusOutlined />} onClick={openRegionSiteCreate}>新增站点</Button>
+                </Space>
+              )}
+            >
+              <Space direction="vertical" size={12} className="full-width">
+                <Form layout="inline" form={regionSiteQueryForm} className="query-bar">
+                  <Form.Item name="regionCode" label="地区"><Input placeholder="地区编码" allowClear /></Form.Item>
+                  <Form.Item name="siteType" label="站点"><Input placeholder="default" allowClear /></Form.Item>
+                  <Form.Item name="status" label="状态">
+                    <Select allowClear placeholder="全部" style={{ width: 120 }} options={statusOptions} />
+                  </Form.Item>
+                  <Button type="primary" onClick={() => loadRegionSites(1, regionSitePage.size)}>查询</Button>
+                </Form>
+                <Table
+                  rowKey="id"
+                  loading={regionSiteLoading}
+                  columns={regionSiteColumns}
+                  dataSource={regionSiteList}
+                  size="small"
+                  scroll={{ x: 1200 }}
+                  pagination={{
+                    current: regionSitePage.page,
+                    pageSize: regionSitePage.size,
+                    total: regionSitePage.total,
+                    onChange: loadRegionSites,
+                  }}
+                />
+              </Space>
+            </Card>
           )}
         </Content>
       </Layout>
@@ -1032,11 +1324,131 @@ function App() {
           <Form.Item name="periodMonth" label="费款所属月份" rules={[{ required: true, message: '请输入 yyyy-MM' }]}>
             <Input placeholder="2026-06" />
           </Form.Item>
-          <Form.Item name="taxNoText" label="税号" rules={[{ required: true, message: '请输入至少一个税号' }]}>
-            <Input.TextArea rows={5} placeholder="多个税号可用换行、空格或逗号分隔" />
+          <Form.Item name="taxNoText" label="税号">
+            <Input.TextArea rows={5} placeholder="留空则按地区生成全部启用企业任务；多个税号可用换行、空格或逗号分隔" />
           </Form.Item>
           <Form.Item name="createAdminName" label="创建人">
             <Input />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="社保缴费任务详情"
+        open={socialTaskDetailOpen}
+        onCancel={() => setSocialTaskDetailOpen(false)}
+        footer={<Button onClick={() => setSocialTaskDetailOpen(false)}>关闭</Button>}
+        width={860}
+      >
+        {currentSocialTask && (
+          <Space direction="vertical" size={12} className="full-width">
+            <Descriptions size="small" column={2} bordered>
+              <Descriptions.Item label="任务">{currentSocialTask.id}</Descriptions.Item>
+              <Descriptions.Item label="批次">{currentSocialTask.batchId || '-'}</Descriptions.Item>
+              <Descriptions.Item label="税号">{currentSocialTask.taxNo}</Descriptions.Item>
+              <Descriptions.Item label="企业">{currentSocialTask.enterpriseName || '-'}</Descriptions.Item>
+              <Descriptions.Item label="社保账号">{currentSocialTask.securityAccountName || '-'}</Descriptions.Item>
+              <Descriptions.Item label="月份">{currentSocialTask.periodMonth || '-'}</Descriptions.Item>
+              <Descriptions.Item label="总状态">{renderStageTag(currentSocialTask.status)}</Descriptions.Item>
+              <Descriptions.Item label="比对">{renderStageTag(currentSocialTask.compareStatus)}</Descriptions.Item>
+              <Descriptions.Item label="缴费">{renderStageTag(currentSocialTask.paymentStatus)}</Descriptions.Item>
+              <Descriptions.Item label="凭证">{renderStageTag(currentSocialTask.certificateStatus)}</Descriptions.Item>
+              <Descriptions.Item label="BMS">{renderStageTag(currentSocialTask.bmsFeedbackStatus)}</Descriptions.Item>
+              <Descriptions.Item label="BMS阶段">{currentSocialTask.bmsFeedbackStage || '-'}</Descriptions.Item>
+              <Descriptions.Item label="WPM/税局金额">{currentSocialTask.wpmTotalAmount ?? '-'} / {currentSocialTask.payableAmount ?? '-'}</Descriptions.Item>
+              <Descriptions.Item label="机器人">{currentSocialTask.workerId || '-'}</Descriptions.Item>
+              <Descriptions.Item label="领取时间">{formatDateTime(currentSocialTask.claimedAt)}</Descriptions.Item>
+              <Descriptions.Item label="心跳时间">{formatDateTime(currentSocialTask.heartbeatAt)}</Descriptions.Item>
+              <Descriptions.Item label="完成时间">{formatDateTime(currentSocialTask.finishedAt)}</Descriptions.Item>
+              <Descriptions.Item label="诊断目录">{currentSocialTask.diagnosticDir || '-'}</Descriptions.Item>
+            </Descriptions>
+            {(currentSocialTask.errorMessage || currentSocialTask.bmsFeedbackErrorMessage) && (
+              <div className="detail-block">
+                {currentSocialTask.errorMessage || currentSocialTask.bmsFeedbackErrorMessage}
+              </div>
+            )}
+            {renderJsonBlock('比对结果', currentSocialTask.compareResultPayload)}
+            {renderJsonBlock('缴费结果', currentSocialTask.paymentResultPayload)}
+            {renderJsonBlock('凭证结果', currentSocialTask.certificateResultPayload)}
+            {renderJsonBlock('BMS反馈结果', currentSocialTask.bmsFeedbackResultPayload)}
+            {renderJsonBlock('任务结果', currentSocialTask.resultPayload)}
+          </Space>
+        )}
+      </Modal>
+
+      <Modal
+        title={editingEnterprise ? '编辑企业' : '新增企业'}
+        open={enterpriseOpen}
+        onCancel={() => setEnterpriseOpen(false)}
+        onOk={submitEnterprise}
+        okText="保存"
+      >
+        <Form layout="vertical" form={enterpriseForm}>
+          <Form.Item name="taxNo" label="税号" rules={[{ required: true, message: '请输入税号' }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="enterpriseName" label="企业名称" rules={[{ required: true, message: '请输入企业名称' }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="regionCode" label="地区编码" rules={[{ required: true, message: '请输入地区编码' }]}>
+            <Input placeholder="liaoning" />
+          </Form.Item>
+          <Form.Item name="securityAccountName" label="社保账号">
+            <Input placeholder="对应 BMS scurityName" />
+          </Form.Item>
+          <Form.Item name="status" label="状态" rules={[{ required: true }]}>
+            <Select options={statusOptions} />
+          </Form.Item>
+          <Form.Item name="remark" label="备注">
+            <Input.TextArea rows={3} />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={editingRegionSite ? '编辑地区站点' : '新增地区站点'}
+        open={regionSiteOpen}
+        onCancel={() => setRegionSiteOpen(false)}
+        onOk={submitRegionSite}
+        okText="保存"
+        width={760}
+      >
+        <Form layout="vertical" form={regionSiteForm}>
+          <Form.Item name="regionCode" label="地区编码" rules={[{ required: true, message: '请输入地区编码' }]}>
+            <Input placeholder="liaoning" />
+          </Form.Item>
+          <Form.Item name="siteType" label="站点类型" rules={[{ required: true, message: '请输入站点类型' }]}>
+            <Input placeholder="default" />
+          </Form.Item>
+          <Form.Item name="etaxEntryUrl" label="电子税务局入口" rules={[{ required: true, message: '请输入入口地址' }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="tpassBaseUrl" label="统一身份认证域名">
+            <Input />
+          </Form.Item>
+          <Form.Item name="loginSuccessUrl" label="登录成功地址特征">
+            <Input />
+          </Form.Item>
+          <Form.Item name="loginButtonText" label="登录按钮文案">
+            <Input />
+          </Form.Item>
+          <Form.Item name="gt4BaseUrl" label="地方特色基础地址">
+            <Input />
+          </Form.Item>
+          <Form.Item name="declarationQueryUrl" label="申报缴费查询地址">
+            <Input.TextArea rows={2} />
+          </Form.Item>
+          <Form.Item name="declarationQueryMenuId" label="申报缴费菜单编号">
+            <Input />
+          </Form.Item>
+          <Form.Item name="socialSecurityPaymentFlowJson" label="社保缴费流程 JSON">
+            <Input.TextArea rows={5} />
+          </Form.Item>
+          <Form.Item name="status" label="状态" rules={[{ required: true }]}>
+            <Select options={statusOptions} />
+          </Form.Item>
+          <Form.Item name="remark" label="备注">
+            <Input.TextArea rows={3} />
           </Form.Item>
         </Form>
       </Modal>
@@ -1149,16 +1561,6 @@ function App() {
         )}
       </Modal>
     </Layout>
-  );
-}
-
-function ConfigPlaceholder({ icon, title, description }: { icon: ReactNode; title: string; description: string }) {
-  return (
-    <div className="config-placeholder">
-      <div className="config-icon">{icon}</div>
-      <div className="config-title">{title}</div>
-      <div className="config-description">{description}</div>
-    </div>
   );
 }
 
@@ -1277,10 +1679,47 @@ function canAdjustPerformance(record: EmployeePerformanceRecord) {
   return record.confirmStatus === 'FEEDBACK_SUBMITTED' && record.feedbackStatus === 'PENDING';
 }
 
+function renderStageTag(value?: string) {
+  if (!value) {
+    return <Tag>-</Tag>;
+  }
+  return <Tag color={statusColor[value] || 'default'}>{stageStatusText[value] || socialTaskStatusText[value] || value}</Tag>;
+}
+
+function renderJsonBlock(title: string, value?: string) {
+  if (!value) {
+    return null;
+  }
+  return (
+    <div className="json-block">
+      <Text strong>{title}</Text>
+      <pre>{formatJsonText(value)}</pre>
+    </div>
+  );
+}
+
+function formatJsonText(value: string) {
+  try {
+    return JSON.stringify(JSON.parse(value), null, 2);
+  } catch {
+    return value;
+  }
+}
+
 type BackendDateValue = string | number | number[] | undefined;
 
 function isPerformanceTaskOpen(status?: string) {
   return status === 'OPEN' || status === 'CONFIRMING';
+}
+
+function getPerformanceTaskDeleteBlockedReason(task: PerformanceTask) {
+  if (isPerformanceTaskOpen(task.statusCode)) {
+    return '请先停用该绩效任务，关闭状态才支持删除';
+  }
+  if ((task.totalCount || 0) > 0) {
+    return '该绩效任务已导入员工记录，不支持删除';
+  }
+  return '';
 }
 
 function formatPeriodRange(startDate?: BackendDateValue, endDate?: BackendDateValue) {

@@ -39,6 +39,14 @@ export interface TaskRecord {
   periodMonth?: string;
   status: string;
   payableAmount?: number;
+  wpmTotalAmount?: number;
+  compareStatus?: string;
+  paymentStatus?: string;
+  certificateStatus?: string;
+  bmsFeedbackStatus?: string;
+  bmsFeedbackStage?: string;
+  bmsFeedbackErrorMessage?: string;
+  diagnosticDir?: string;
   errorCode?: string;
   errorMessage?: string;
   retryable?: boolean;
@@ -46,6 +54,41 @@ export interface TaskRecord {
   claimedAt?: string;
   heartbeatAt?: string;
   finishedAt?: string;
+  resultPayload?: string;
+  compareResultPayload?: string;
+  paymentResultPayload?: string;
+  certificateResultPayload?: string;
+  bmsFeedbackResultPayload?: string;
+  gmtModified?: string;
+}
+
+export interface SocialSecurityEnterprise {
+  id: number;
+  taxNo: string;
+  enterpriseName: string;
+  regionCode: string;
+  securityAccountName?: string;
+  status: string;
+  remark?: string;
+  gmtCreate?: string;
+  gmtModified?: string;
+}
+
+export interface SocialSecurityRegionSite {
+  id: number;
+  regionCode: string;
+  siteType: string;
+  etaxEntryUrl: string;
+  tpassBaseUrl?: string;
+  loginSuccessUrl?: string;
+  loginButtonText?: string;
+  gt4BaseUrl?: string;
+  declarationQueryUrl?: string;
+  declarationQueryMenuId?: string;
+  socialSecurityPaymentFlowJson?: string;
+  status: string;
+  remark?: string;
+  gmtCreate?: string;
   gmtModified?: string;
 }
 
@@ -202,6 +245,30 @@ export function fetchTasks(params: Record<string, unknown>) {
 
 export function retryTask(taskId: number) {
   return unwrap<void>(request.post(`/api/social-security-payments/tasks/${taskId}/retry`));
+}
+
+export function fetchSocialSecurityEnterprises(params: Record<string, unknown>) {
+  return unwrap<PageResp<SocialSecurityEnterprise>>(request.get('/api/social-security-config/enterprises', { params }));
+}
+
+export function saveSocialSecurityEnterprise(data: Partial<SocialSecurityEnterprise>) {
+  return unwrap<SocialSecurityEnterprise>(request.post('/api/social-security-config/enterprises', data));
+}
+
+export function deleteSocialSecurityEnterprise(id: number) {
+  return unwrap<void>(request.post(`/api/social-security-config/enterprises/${id}/delete`));
+}
+
+export function fetchSocialSecurityRegionSites(params: Record<string, unknown>) {
+  return unwrap<PageResp<SocialSecurityRegionSite>>(request.get('/api/social-security-config/region-sites', { params }));
+}
+
+export function saveSocialSecurityRegionSite(data: Partial<SocialSecurityRegionSite>) {
+  return unwrap<SocialSecurityRegionSite>(request.post('/api/social-security-config/region-sites', data));
+}
+
+export function deleteSocialSecurityRegionSite(id: number) {
+  return unwrap<void>(request.post(`/api/social-security-config/region-sites/${id}/delete`));
 }
 
 export function createPerformanceTask(data: {

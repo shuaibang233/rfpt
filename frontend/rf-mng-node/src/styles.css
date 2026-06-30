@@ -39,6 +39,8 @@ body { margin: 0; background: #f5f7fb; color: #1f2937; font-family: -apple-syste
 .ant-card .ant-card-head { padding-inline: 16px; }
 .ant-card .ant-card-body { padding: 16px; }
 .detail-block { min-height: 88px; white-space: pre-wrap; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; }
+.json-block { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; }
+.json-block pre { max-height: 260px; margin: 8px 0 0; overflow: auto; color: #374151; font-size: 12px; line-height: 18px; white-space: pre; }
 .readonly-field { display: inline-flex; min-height: 32px; align-items: center; color: #111827; }
 .import-task-readonly { min-height: 36px; padding: 4px 11px; background: #f8fafc; border: 1px solid #d9d9d9; border-radius: 6px; }
 .deadline-summary { margin-bottom: 24px; padding: 12px 14px; background: #f8fafc; border: 1px solid #eef2f7; border-radius: 6px; }

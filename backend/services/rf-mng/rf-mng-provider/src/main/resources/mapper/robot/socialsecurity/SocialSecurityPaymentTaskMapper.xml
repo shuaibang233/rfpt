@@ -12,6 +12,14 @@
         <result property="periodMonth" column="settle_month"/>
         <result property="status" column="task_status"/>
         <result property="payableAmount" column="tax_total_amount"/>
+        <result property="wpmTotalAmount" column="wpm_total_amount"/>
+        <result property="compareStatus" column="compare_status"/>
+        <result property="paymentStatus" column="payment_status"/>
+        <result property="certificateStatus" column="certificate_status"/>
+        <result property="bmsFeedbackStatus" column="bms_feedback_status"/>
+        <result property="bmsFeedbackStage" column="bms_feedback_stage"/>
+        <result property="bmsFeedbackErrorMessage" column="bms_feedback_error_message"/>
+        <result property="diagnosticDir" column="diagnostic_dir"/>
         <result property="errorMessage" column="error_message"/>
         <result property="retryable" column="retryable"/>
         <result property="retryCount" column="retry_count"/>
@@ -22,6 +30,10 @@
         <result property="startedAt" column="started_at"/>
         <result property="finishedAt" column="finished_at"/>
         <result property="resultPayload" column="result_body"/>
+        <result property="compareResultPayload" column="compare_result_json"/>
+        <result property="paymentResultPayload" column="payment_result_json"/>
+        <result property="certificateResultPayload" column="certificate_result_json"/>
+        <result property="bmsFeedbackResultPayload" column="bms_feedback_result_json"/>
         <result property="createAdminId" column="create_admin_id"/>
         <result property="createAdminName" column="create_admin_name"/>
         <result property="gmtCreate" column="gmt_create"/>

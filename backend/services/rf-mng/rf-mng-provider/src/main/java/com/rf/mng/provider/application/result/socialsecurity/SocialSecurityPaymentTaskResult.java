@@ -43,6 +43,22 @@ public class SocialSecurityPaymentTaskResult implements Serializable {
 
     /** 应缴总额。 */
     private BigDecimal payableAmount;
+    /** WPM 合计金额。 */
+    private BigDecimal wpmTotalAmount;
+    /** 一致性校验状态。 */
+    private String compareStatus;
+    /** 缴费状态。 */
+    private String paymentStatus;
+    /** 完税凭证状态。 */
+    private String certificateStatus;
+    /** BMS 反馈状态。 */
+    private String bmsFeedbackStatus;
+    /** BMS 反馈阶段。 */
+    private String bmsFeedbackStage;
+    /** BMS 反馈错误信息。 */
+    private String bmsFeedbackErrorMessage;
+    /** 诊断目录。 */
+    private String diagnosticDir;
 
     /** 失败编码。 */
     private String errorCode;
@@ -64,6 +80,16 @@ public class SocialSecurityPaymentTaskResult implements Serializable {
 
     /** 机器人完成时间。 */
     private LocalDateTime finishedAt;
+    /** 机器人回写任务结果。 */
+    private String resultPayload;
+    /** 一致性校验结果 JSON。 */
+    private String compareResultPayload;
+    /** 缴费结果 JSON。 */
+    private String paymentResultPayload;
+    /** 凭证结果 JSON。 */
+    private String certificateResultPayload;
+    /** BMS 反馈结果 JSON。 */
+    private String bmsFeedbackResultPayload;
 
     /** 修改时间。 */
     private LocalDateTime gmtModified;

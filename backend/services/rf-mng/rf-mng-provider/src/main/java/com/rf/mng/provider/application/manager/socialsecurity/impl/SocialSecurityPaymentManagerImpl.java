@@ -9,6 +9,8 @@ import com.rf.mng.provider.application.manager.socialsecurity.SocialSecurityPaym
 import com.rf.mng.provider.application.port.persistence.socialsecurity.SocialSecurityPaymentBatchPersistencePort;
 import com.rf.mng.provider.application.port.persistence.socialsecurity.SocialSecurityRobotReferencePersistencePort;
 import com.rf.mng.provider.application.port.persistence.socialsecurity.SocialSecurityPaymentTaskPersistencePort;
+import com.rf.mng.provider.application.port.persistence.socialsecurity.config.SocialSecurityConfigPersistencePort;
+import com.rf.mng.provider.application.port.persistence.socialsecurity.config.record.SocialSecurityEnterpriseRecord;
 import com.rf.mng.provider.application.port.persistence.socialsecurity.data.SocialSecurityPaymentBatchData;
 import com.rf.mng.provider.application.port.persistence.socialsecurity.data.SocialSecurityPaymentTaskData;
 import com.rf.mng.provider.application.port.persistence.socialsecurity.record.SocialSecurityPaymentBatchRecord;
@@ -47,6 +49,10 @@ public class SocialSecurityPaymentManagerImpl implements SocialSecurityPaymentMa
     /** 机器人基础信息持久化端口。 */
     @Resource
     private SocialSecurityRobotReferencePersistencePort robotReferencePersistencePort;
+
+    /** 社保缴费配置持久化端口。 */
+    @Resource
+    private SocialSecurityConfigPersistencePort configPersistencePort;
 
     @Override
     @Transactional(rollbackFor = Exception.class, transactionManager = "transactionManager")
@@ -106,10 +112,7 @@ public class SocialSecurityPaymentManagerImpl implements SocialSecurityPaymentMa
     }
 
     private int countTaxNos(SocialSecurityPaymentBatchCreateCommand command) {
-        if (command.getTaxNoList() == null) {
-            return 0;
-        }
-        return (int) command.getTaxNoList().stream().filter(StringUtils::isNotBlank).count();
+        return resolveTaxNos(command).size();
     }
 
     /**
@@ -212,7 +215,7 @@ public class SocialSecurityPaymentManagerImpl implements SocialSecurityPaymentMa
 
     private List<SocialSecurityPaymentTaskData> buildTasks(SocialSecurityPaymentBatchData batch,
                                                              SocialSecurityPaymentBatchCreateCommand command) {
-        List<String> taxNoList = command.getTaxNoList() == null ? List.of() : command.getTaxNoList();
+        List<String> taxNoList = resolveTaxNos(command);
         List<SocialSecurityPaymentTaskData> tasks = new ArrayList<>();
         for (String taxNo : taxNoList) {
             if (StringUtils.isBlank(taxNo)) {
@@ -233,9 +236,24 @@ public class SocialSecurityPaymentManagerImpl implements SocialSecurityPaymentMa
             tasks.add(task);
         }
         if (tasks.isEmpty()) {
-            throw new BusinessException(ErrorCode.E999001, "第一版需要传入纳税人识别号列表");
+            throw new BusinessException(ErrorCode.E999001, "未找到需要缴费的企业税号");
         }
         return tasks;
+    }
+
+    private List<String> resolveTaxNos(SocialSecurityPaymentBatchCreateCommand command) {
+        if (command.getTaxNoList() != null && command.getTaxNoList().stream().anyMatch(StringUtils::isNotBlank)) {
+            return command.getTaxNoList().stream()
+                    .filter(StringUtils::isNotBlank)
+                    .map(String::trim)
+                    .distinct()
+                    .toList();
+        }
+        return configPersistencePort.listActiveEnterpriseByRegion(command.getRegionCode()).stream()
+                .map(SocialSecurityEnterpriseRecord::getTaxNo)
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .toList();
     }
 
     private SocialSecurityPaymentBatchResult toBatchResult(SocialSecurityPaymentBatchRecord entity) {
@@ -263,6 +281,14 @@ public class SocialSecurityPaymentManagerImpl implements SocialSecurityPaymentMa
         result.setPeriodMonth(entity.getPeriodMonth());
         result.setStatus(entity.getStatus());
         result.setPayableAmount(entity.getPayableAmount());
+        result.setWpmTotalAmount(entity.getWpmTotalAmount());
+        result.setCompareStatus(entity.getCompareStatus());
+        result.setPaymentStatus(entity.getPaymentStatus());
+        result.setCertificateStatus(entity.getCertificateStatus());
+        result.setBmsFeedbackStatus(entity.getBmsFeedbackStatus());
+        result.setBmsFeedbackStage(entity.getBmsFeedbackStage());
+        result.setBmsFeedbackErrorMessage(entity.getBmsFeedbackErrorMessage());
+        result.setDiagnosticDir(entity.getDiagnosticDir());
         result.setErrorCode(entity.getErrorCode());
         result.setErrorMessage(entity.getErrorMessage());
         result.setRetryable(entity.getRetryable());
@@ -270,6 +296,11 @@ public class SocialSecurityPaymentManagerImpl implements SocialSecurityPaymentMa
         result.setClaimedAt(entity.getClaimedAt());
         result.setHeartbeatAt(entity.getHeartbeatAt());
         result.setFinishedAt(entity.getFinishedAt());
+        result.setResultPayload(entity.getResultPayload());
+        result.setCompareResultPayload(entity.getCompareResultPayload());
+        result.setPaymentResultPayload(entity.getPaymentResultPayload());
+        result.setCertificateResultPayload(entity.getCertificateResultPayload());
+        result.setBmsFeedbackResultPayload(entity.getBmsFeedbackResultPayload());
         result.setGmtModified(entity.getGmtModified());
         return result;
     }

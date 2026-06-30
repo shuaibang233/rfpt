@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.rf.mng.provider.infrastructure.persistence.robot.socialsecurity.config.mapper.SocialSecurityConfigMapper">
+    <resultMap id="EnterpriseMap" type="com.rf.mng.provider.infrastructure.persistence.socialsecurity.config.entity.SocialSecurityEnterpriseConfigEntity">
+        <id property="id" column="id"/>
+        <result property="taxNo" column="tax_no"/>
+        <result property="enterpriseName" column="enterprise_name"/>
+        <result property="regionCode" column="region_code"/>
+        <result property="securityAccountName" column="security_account_name"/>
+        <result property="status" column="status"/>
+        <result property="remark" column="remark"/>
+        <result property="gmtCreate" column="gmt_create"/>
+        <result property="gmtModified" column="gmt_modified"/>
+    </resultMap>
+
+    <resultMap id="RegionSiteMap" type="com.rf.mng.provider.infrastructure.persistence.socialsecurity.config.entity.SocialSecurityRegionSiteConfigEntity">
+        <id property="id" column="id"/>
+        <result property="regionCode" column="region_code"/>
+        <result property="siteType" column="site_type"/>
+        <result property="etaxEntryUrl" column="etax_entry_url"/>
+        <result property="tpassBaseUrl" column="tpass_base_url"/>
+        <result property="loginSuccessUrl" column="login_success_url"/>
+        <result property="loginButtonText" column="login_button_text"/>
+        <result property="gt4BaseUrl" column="gt4_base_url"/>
+        <result property="declarationQueryUrl" column="declaration_query_url"/>
+        <result property="declarationQueryMenuId" column="declaration_query_menu_id"/>
+        <result property="socialSecurityPaymentFlowJson" column="social_security_payment_flow_json"/>
+        <result property="status" column="status"/>
+        <result property="remark" column="remark"/>
+        <result property="gmtCreate" column="gmt_create"/>
+        <result property="gmtModified" column="gmt_modified"/>
+    </resultMap>
+
+    <sql id="EnterpriseWhere">
+        <where>
+            <if test="query.taxNo != null and query.taxNo != ''">
+                AND tax_no = #{query.taxNo}
+            </if>
+            <if test="query.enterpriseName != null and query.enterpriseName != ''">
+                AND enterprise_name LIKE CONCAT('%', #{query.enterpriseName}, '%')
+            </if>
+            <if test="query.regionCode != null and query.regionCode != ''">
+                AND region_code = #{query.regionCode}
+            </if>
+            <if test="query.status != null and query.status != ''">
+                AND status = #{query.status}
+            </if>
+        </where>
+    </sql>
+
+    <sql id="RegionSiteWhere">
+        <where>
+            <if test="query.regionCode != null and query.regionCode != ''">
+                AND region_code = #{query.regionCode}
+            </if>
+            <if test="query.siteType != null and query.siteType != ''">
+                AND site_type = #{query.siteType}
+            </if>
+            <if test="query.status != null and query.status != ''">
+                AND status = #{query.status}
+            </if>
+        </where>
+    </sql>
+
+    <select id="countEnterprise" resultType="long">
+        SELECT COUNT(1)
+        FROM tb_tax_enterprise
+        <include refid="EnterpriseWhere"/>
+    </select>
+
+    <select id="pageEnterprise" resultMap="EnterpriseMap">
+        SELECT id, tax_no, enterprise_name, region_code, security_account_name, status, remark, gmt_create, gmt_modified
+        FROM tb_tax_enterprise
+        <include refid="EnterpriseWhere"/>
+        ORDER BY id DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <select id="listActiveEnterpriseByRegion" resultMap="EnterpriseMap">
+        SELECT id, tax_no, enterprise_name, region_code, security_account_name, status, remark, gmt_create, gmt_modified
+        FROM tb_tax_enterprise
+        WHERE region_code = #{regionCode}
+          AND status = 'active'
+        ORDER BY id ASC
+    </select>
+
+    <select id="findEnterpriseById" resultMap="EnterpriseMap">
+        SELECT id, tax_no, enterprise_name, region_code, security_account_name, status, remark, gmt_create, gmt_modified
+        FROM tb_tax_enterprise
+        WHERE id = #{id}
+    </select>
+
+    <select id="findEnterpriseByTaxNo" resultMap="EnterpriseMap">
+        SELECT id, tax_no, enterprise_name, region_code, security_account_name, status, remark, gmt_create, gmt_modified
+        FROM tb_tax_enterprise
+        WHERE tax_no = #{taxNo}
+    </select>
+
+    <insert id="insertEnterprise" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO tb_tax_enterprise
+        (tax_no, enterprise_name, region_code, security_account_name, status, remark)
+        VALUES
+        (#{taxNo}, #{enterpriseName}, #{regionCode}, #{securityAccountName}, #{status}, #{remark})
+    </insert>
+
+    <update id="updateEnterprise">
+        UPDATE tb_tax_enterprise
+        SET tax_no = #{taxNo},
+            enterprise_name = #{enterpriseName},
+            region_code = #{regionCode},
+            security_account_name = #{securityAccountName},
+            status = #{status},
+            remark = #{remark}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteEnterpriseById">
+        DELETE FROM tb_tax_enterprise
+        WHERE id = #{id}
+    </delete>
+
+    <select id="countRegionSite" resultType="long">
+        SELECT COUNT(1)
+        FROM tb_tax_region_site
+        <include refid="RegionSiteWhere"/>
+    </select>
+
+    <select id="pageRegionSite" resultMap="RegionSiteMap">
+        SELECT id, region_code, site_type, etax_entry_url, tpass_base_url, login_success_url,
+               login_button_text, gt4_base_url, declaration_query_url, declaration_query_menu_id,
+               social_security_payment_flow_json, status, remark, gmt_create, gmt_modified
+        FROM tb_tax_region_site
+        <include refid="RegionSiteWhere"/>
+        ORDER BY id DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <select id="findRegionSiteById" resultMap="RegionSiteMap">
+        SELECT id, region_code, site_type, etax_entry_url, tpass_base_url, login_success_url,
+               login_button_text, gt4_base_url, declaration_query_url, declaration_query_menu_id,
+               social_security_payment_flow_json, status, remark, gmt_create, gmt_modified
+        FROM tb_tax_region_site
+        WHERE id = #{id}
+    </select>
+
+    <select id="findRegionSiteByCodeAndType" resultMap="RegionSiteMap">
+        SELECT id, region_code, site_type, etax_entry_url, tpass_base_url, login_success_url,
+               login_button_text, gt4_base_url, declaration_query_url, declaration_query_menu_id,
+               social_security_payment_flow_json, status, remark, gmt_create, gmt_modified
+        FROM tb_tax_region_site
+        WHERE region_code = #{regionCode}
+          AND site_type = #{siteType}
+    </select>
+
+    <insert id="insertRegionSite" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO tb_tax_region_site
+        (region_code, site_type, etax_entry_url, tpass_base_url, login_success_url, login_button_text,
+         gt4_base_url, declaration_query_url, declaration_query_menu_id, social_security_payment_flow_json, status, remark)
+        VALUES
+        (#{regionCode}, #{siteType}, #{etaxEntryUrl}, #{tpassBaseUrl}, #{loginSuccessUrl}, #{loginButtonText},
+         #{gt4BaseUrl}, #{declarationQueryUrl}, #{declarationQueryMenuId}, #{socialSecurityPaymentFlowJson}, #{status}, #{remark})
+    </insert>
+
+    <update id="updateRegionSite">
+        UPDATE tb_tax_region_site
+        SET region_code = #{regionCode},
+            site_type = #{siteType},
+            etax_entry_url = #{etaxEntryUrl},
+            tpass_base_url = #{tpassBaseUrl},
+            login_success_url = #{loginSuccessUrl},
+            login_button_text = #{loginButtonText},
+            gt4_base_url = #{gt4BaseUrl},
+            declaration_query_url = #{declarationQueryUrl},
+            declaration_query_menu_id = #{declarationQueryMenuId},
+            social_security_payment_flow_json = #{socialSecurityPaymentFlowJson},
+            status = #{status},
+            remark = #{remark}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteRegionSiteById">
+        DELETE FROM tb_tax_region_site
+        WHERE id = #{id}
+    </delete>
+</mapper>

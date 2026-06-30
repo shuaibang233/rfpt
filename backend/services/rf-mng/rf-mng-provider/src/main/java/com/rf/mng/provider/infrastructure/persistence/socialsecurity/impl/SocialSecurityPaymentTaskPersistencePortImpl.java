@@ -93,6 +93,14 @@ public class SocialSecurityPaymentTaskPersistencePortImpl implements SocialSecur
         record.setPeriodMonth(entity.getPeriodMonth());
         record.setStatus(entity.getStatus());
         record.setPayableAmount(entity.getPayableAmount());
+        record.setWpmTotalAmount(entity.getWpmTotalAmount());
+        record.setCompareStatus(entity.getCompareStatus());
+        record.setPaymentStatus(entity.getPaymentStatus());
+        record.setCertificateStatus(entity.getCertificateStatus());
+        record.setBmsFeedbackStatus(entity.getBmsFeedbackStatus());
+        record.setBmsFeedbackStage(entity.getBmsFeedbackStage());
+        record.setBmsFeedbackErrorMessage(entity.getBmsFeedbackErrorMessage());
+        record.setDiagnosticDir(entity.getDiagnosticDir());
         record.setErrorCode(entity.getErrorCode());
         record.setErrorMessage(entity.getErrorMessage());
         record.setRetryable(entity.getRetryable());
@@ -104,6 +112,10 @@ public class SocialSecurityPaymentTaskPersistencePortImpl implements SocialSecur
         record.setStartedAt(entity.getStartedAt());
         record.setFinishedAt(entity.getFinishedAt());
         record.setResultPayload(entity.getResultPayload());
+        record.setCompareResultPayload(entity.getCompareResultPayload());
+        record.setPaymentResultPayload(entity.getPaymentResultPayload());
+        record.setCertificateResultPayload(entity.getCertificateResultPayload());
+        record.setBmsFeedbackResultPayload(entity.getBmsFeedbackResultPayload());
         record.setCreateAdminId(entity.getCreateAdminId());
         record.setCreateAdminName(entity.getCreateAdminName());
         record.setGmtCreate(entity.getGmtCreate());
