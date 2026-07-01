@@ -11,6 +11,7 @@ import com.rf.performance.api.remoteservice.performance.RemoteEmployeePerformanc
 import com.rf.performance.provider.application.manager.performance.EmployeePerformanceManager;
 import com.rf.performance.provider.application.result.performance.EmployeePerformanceImportResult;
 import com.zy.common.core.bo.PageResp;
+import com.zy.common.core.exception.BusinessException;
 import com.rf.performance.provider.interfaces.remoteserviceimpl.performance.converter.RemoteEmployeePerformanceConverter;
 import org.apache.dubbo.config.annotation.DubboService;
 
@@ -35,7 +36,7 @@ public class RemoteEmployeePerformanceServiceImpl implements RemoteEmployeePerfo
      * @return 员工绩效导入结果
      */
     @Override
-    public EmployeePerformanceImportResultDto importRecords(EmployeePerformanceImportParam param) {
+    public EmployeePerformanceImportResultDto importRecords(EmployeePerformanceImportParam param) throws BusinessException {
         EmployeePerformanceImportResult result = employeePerformanceManager.importRecords(RemoteEmployeePerformanceConverter.toImportCommand(param));
         return RemoteEmployeePerformanceConverter.toImportDto(result);
     }
@@ -59,7 +60,7 @@ public class RemoteEmployeePerformanceServiceImpl implements RemoteEmployeePerfo
      * @return 员工绩效调整结果
      */
     @Override
-    public EmployeePerformanceAdjustDto adjustPerformance(EmployeePerformanceAdjustParam param) {
+    public EmployeePerformanceAdjustDto adjustPerformance(EmployeePerformanceAdjustParam param) throws BusinessException {
         return RemoteEmployeePerformanceConverter.toAdjustDto(
                 employeePerformanceManager.adjustPerformance(RemoteEmployeePerformanceConverter.toAdjustCommand(param)));
     }
@@ -70,7 +71,7 @@ public class RemoteEmployeePerformanceServiceImpl implements RemoteEmployeePerfo
      * @param param 反馈处理入参
      */
     @Override
-    public void handleFeedbackUnchanged(EmployeePerformanceFeedbackHandleParam param) {
+    public void handleFeedbackUnchanged(EmployeePerformanceFeedbackHandleParam param) throws BusinessException {
         employeePerformanceManager.handleFeedbackUnchanged(RemoteEmployeePerformanceConverter.toFeedbackHandleCommand(param));
     }
 }

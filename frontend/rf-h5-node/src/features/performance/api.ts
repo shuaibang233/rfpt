@@ -51,8 +51,8 @@ export const performanceApi = {
   /**
    * 确认绩效。
    */
-  confirm(recordId: number, data: { smsCode: string }) {
-    return apiPost<void>(`/performance/employee/records/${recordId}/confirm`, data);
+  confirm(recordId: number) {
+    return apiPost<void>(`/performance/employee/records/${recordId}/confirm`, {});
   },
 
   /**

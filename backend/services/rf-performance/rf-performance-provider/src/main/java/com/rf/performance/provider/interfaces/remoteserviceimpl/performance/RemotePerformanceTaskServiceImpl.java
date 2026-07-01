@@ -9,6 +9,7 @@ import com.rf.performance.provider.application.result.performance.PerformanceTas
 import com.rf.performance.provider.interfaces.remoteserviceimpl.performance.converter.RemotePerformanceTaskConverter;
 import org.apache.dubbo.config.annotation.DubboService;
 import com.zy.common.core.bo.PageResp;
+import com.zy.common.core.exception.BusinessException;
 
 import javax.annotation.Resource;
 
@@ -31,7 +32,7 @@ public class RemotePerformanceTaskServiceImpl implements RemotePerformanceTaskSe
      * @return 绩效任务信息
      */
     @Override
-    public PerformanceTaskDto createTask(PerformanceTaskCreateParam param) {
+    public PerformanceTaskDto createTask(PerformanceTaskCreateParam param) throws BusinessException {
         PerformanceTaskResult result = performanceTaskManager.createTask(RemotePerformanceTaskConverter.toCreateCommand(param));
         return RemotePerformanceTaskConverter.toDto(result);
     }
@@ -54,7 +55,7 @@ public class RemotePerformanceTaskServiceImpl implements RemotePerformanceTaskSe
      * @param taskId 绩效任务 ID
      */
     @Override
-    public void enableTask(Long taskId) {
+    public void enableTask(Long taskId) throws BusinessException {
         performanceTaskManager.enableTask(taskId);
     }
 
@@ -64,7 +65,7 @@ public class RemotePerformanceTaskServiceImpl implements RemotePerformanceTaskSe
      * @param taskId 绩效任务 ID
      */
     @Override
-    public void disableTask(Long taskId) {
+    public void disableTask(Long taskId) throws BusinessException {
         performanceTaskManager.disableTask(taskId);
     }
 
@@ -74,7 +75,7 @@ public class RemotePerformanceTaskServiceImpl implements RemotePerformanceTaskSe
      * @param taskId 绩效任务 ID
      */
     @Override
-    public void deleteTask(Long taskId) {
+    public void deleteTask(Long taskId) throws BusinessException {
         performanceTaskManager.deleteTask(taskId);
     }
 }

@@ -24,6 +24,7 @@ import com.rf.performance.provider.domain.performance.PerformanceFeedbackStatus;
 import com.rf.performance.provider.domain.performance.PerformanceTaskStatus;
 import com.zy.common.core.enums.ErrorCode;
 import com.zy.common.core.exception.BusinessException;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,6 +43,7 @@ import java.util.regex.Pattern;
 /**
  * 员工端绩效应用编排实现。
  */
+@Slf4j
 @Service
 public class EmployeePerformanceClientManagerImpl implements EmployeePerformanceClientManager {
 
@@ -98,6 +100,9 @@ public class EmployeePerformanceClientManagerImpl implements EmployeePerformance
         String scene = StringUtils.defaultIfBlank(safeCommand.getScene(), "LOGIN");
         if (StringUtils.equals(scene, "LOGIN")) {
             assertMobileHasPendingPerformance(safeCommand.getMobile());
+            if (StringUtils.isBlank(safeCommand.getCaptchaTraceId())) {
+                log.warn("登录短信发送缺少图形验证码凭证, mobile={}, scene={}", maskMobile(safeCommand.getMobile()), scene);
+            }
             verifyCaptcha(safeCommand.getCaptchaTraceId());
         }
         String code = createSmsCode();
@@ -174,12 +179,9 @@ public class EmployeePerformanceClientManagerImpl implements EmployeePerformance
     public void confirm(EmployeePerformanceConfirmCommand command) {
         EmployeePerformanceConfirmCommand safeCommand = command == null ? new EmployeePerformanceConfirmCommand() : command;
         validateMobile(safeCommand.getMobile());
-        PerformanceSmsEvidenceData smsEvidence = verifySmsCode(safeCommand.getMobile(), "CONFIRM", safeCommand.getSmsCode());
         EmployeePerformanceClientRecord record = requireRecord(safeCommand.getRecordId(), safeCommand.getMobile());
         assertConfirmAllowed(record);
-        smsEvidence.setVerifiedAt(LocalDateTime.now());
-        employeePerformanceClientPersistencePort.markSmsVerified(smsEvidence);
-        insertConfirmLog(safeCommand, record, smsEvidence);
+        insertConfirmLog(safeCommand, record);
         String nextStatus = nextConfirmStatus(record.getConfirmStatus());
         if (!employeePerformanceClientPersistencePort.markConfirmed(record.getId(), record.getMobile(), nextStatus)) {
             throw new BusinessException(ErrorCode.E999002, "绩效确认失败");
@@ -254,6 +256,19 @@ public class EmployeePerformanceClientManagerImpl implements EmployeePerformance
         if (StringUtils.isBlank(mobile) || !MOBILE_PATTERN.matcher(mobile).matches()) {
             throw new BusinessException(ErrorCode.E999001, "请输入正确的手机号");
         }
+    }
+
+    /**
+     * 脱敏手机号。
+     *
+     * @param mobile 手机号
+     * @return 脱敏手机号
+     */
+    private String maskMobile(String mobile) {
+        if (!MOBILE_PATTERN.matcher(StringUtils.defaultString(mobile)).matches()) {
+            return "-";
+        }
+        return mobile.substring(0, 3) + "****" + mobile.substring(7);
     }
 
     /**
@@ -504,46 +519,19 @@ public class EmployeePerformanceClientManagerImpl implements EmployeePerformance
     }
 
     /**
-     * 构建已验证短信凭证。
-     *
-     * @param mobile 手机号
-     * @param scene 短信场景
-     * @param ipAddress 请求 IP
-     * @param userAgent 浏览器 User-Agent
-     * @return 短信验证留痕写入数据
-     */
-    private PerformanceSmsEvidenceData verifiedSmsEvidence(String mobile, String scene, String ipAddress, String userAgent) {
-        LocalDateTime now = LocalDateTime.now();
-        PerformanceSmsEvidenceData data = new PerformanceSmsEvidenceData();
-        data.setMobile(mobile);
-        data.setScene(scene);
-        data.setSmsSendBizId(UUID.randomUUID().toString());
-        data.setIpAddress(ipAddress);
-        data.setUserAgent(userAgent);
-        data.setSentAt(now);
-        data.setVerifiedAt(now);
-        return data;
-    }
-
-    /**
      * 新增确认留痕。
      *
      * @param command 确认命令
      * @param record 员工绩效记录
-     * @param smsEvidence 短信验证留痕
      */
     private void insertConfirmLog(EmployeePerformanceConfirmCommand command,
-                                  EmployeePerformanceClientRecord record,
-                                  PerformanceSmsEvidenceData smsEvidence) {
+                                  EmployeePerformanceClientRecord record) {
         PerformanceConfirmLogData data = new PerformanceConfirmLogData();
         data.setTaskId(record.getTaskId());
         data.setRecordId(record.getId());
         data.setMobile(record.getMobile());
         data.setConfirmType(confirmType(record.getConfirmStatus()));
         data.setPerformanceSnapshot(record.getPerformance());
-        data.setSmsEvidenceId(smsEvidence.getId());
-        data.setSmsSendBizId(smsEvidence.getSmsSendBizId());
-        data.setSmsVerifiedAt(smsEvidence.getVerifiedAt());
         data.setIpAddress(command.getIpAddress());
         data.setUserAgent(command.getUserAgent());
         employeePerformanceClientPersistencePort.insertConfirmLog(data);

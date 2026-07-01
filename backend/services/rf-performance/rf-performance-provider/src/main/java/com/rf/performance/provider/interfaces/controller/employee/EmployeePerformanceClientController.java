@@ -6,7 +6,6 @@ import com.rf.performance.provider.application.command.performance.employee.Empl
 import com.rf.performance.provider.application.manager.performance.employee.EmployeePerformanceClientManager;
 import com.rf.performance.provider.application.result.performance.employee.EmployeePerformanceClientResult;
 import com.rf.performance.provider.common.web.EmployeePerformanceRequestContext;
-import com.rf.performance.provider.interfaces.controller.employee.param.EmployeePerformanceConfirmCtrlParam;
 import com.rf.performance.provider.interfaces.controller.employee.param.EmployeePerformanceFeedbackCtrlParam;
 import com.rf.performance.provider.interfaces.controller.employee.vo.EmployeePerformanceRecordVo;
 import com.zy.common.core.bo.Result;
@@ -59,18 +58,15 @@ public class EmployeePerformanceClientController {
      * 确认绩效。
      *
      * @param recordId 员工绩效记录 ID
-     * @param param 确认参数
      * @param request HTTP 请求
      * @return 空结果
      */
     @PostMapping("/{recordId}/confirm")
     public Result<Void> confirm(@PathVariable Long recordId,
-                                @RequestBody EmployeePerformanceConfirmCtrlParam param,
                                 HttpServletRequest request) {
         EmployeePerformanceConfirmCommand command = new EmployeePerformanceConfirmCommand();
         command.setRecordId(recordId);
         command.setMobile(employeePerformanceRequestContext.requireMobile(request));
-        command.setSmsCode(param == null ? null : param.getSmsCode());
         command.setIpAddress(employeePerformanceRequestContext.clientIp(request));
         command.setUserAgent(employeePerformanceRequestContext.userAgent(request));
         employeePerformanceClientManager.confirm(command);

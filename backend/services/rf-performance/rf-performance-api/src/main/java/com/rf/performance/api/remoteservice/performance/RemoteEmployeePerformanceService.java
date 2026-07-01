@@ -8,6 +8,7 @@ import com.rf.performance.api.param.performance.admin.EmployeePerformanceAdjustP
 import com.rf.performance.api.param.performance.admin.EmployeePerformanceFeedbackHandleParam;
 import com.rf.performance.api.query.performance.EmployeePerformancePageParam;
 import com.zy.common.core.bo.PageResp;
+import com.zy.common.core.exception.BusinessException;
 
 /**
  * 员工绩效记录 RPC 服务。
@@ -20,7 +21,7 @@ public interface RemoteEmployeePerformanceService {
      * @param param 员工绩效导入入参
      * @return 员工绩效导入结果
      */
-    EmployeePerformanceImportResultDto importRecords(EmployeePerformanceImportParam param);
+    EmployeePerformanceImportResultDto importRecords(EmployeePerformanceImportParam param) throws BusinessException;
 
     /**
      * 分页查询员工绩效记录。
@@ -36,12 +37,12 @@ public interface RemoteEmployeePerformanceService {
      * @param param 员工绩效调整入参
      * @return 员工绩效调整结果
      */
-    EmployeePerformanceAdjustDto adjustPerformance(EmployeePerformanceAdjustParam param);
+    EmployeePerformanceAdjustDto adjustPerformance(EmployeePerformanceAdjustParam param) throws BusinessException;
 
     /**
      * 处理反馈且不调整绩效。
      *
      * @param param 反馈处理入参
      */
-    void handleFeedbackUnchanged(EmployeePerformanceFeedbackHandleParam param);
+    void handleFeedbackUnchanged(EmployeePerformanceFeedbackHandleParam param) throws BusinessException;
 }

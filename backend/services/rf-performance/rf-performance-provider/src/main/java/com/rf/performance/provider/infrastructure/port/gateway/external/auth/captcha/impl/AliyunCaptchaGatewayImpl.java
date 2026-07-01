@@ -105,6 +105,7 @@ public class AliyunCaptchaGatewayImpl implements CaptchaGateway {
      */
     private void validateParam(CaptchaVerifyGatewayParam param) {
         if (StringUtils.isBlank(param.getCaptchaVerifyParam())) {
+            log.warn("阿里云验证码校验缺少 captchaVerifyParam");
             throw new BusinessException(ErrorCode.E999001, "请先完成验证码校验");
         }
     }

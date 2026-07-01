@@ -28,7 +28,6 @@ declare global {
 }
 
 const LOGIN_SCENE = 'LOGIN';
-const CONFIRM_SCENE = 'CONFIRM';
 const CAPTCHA_ELEMENT_ID = 'aliyun-captcha-element';
 const CAPTCHA_BUTTON_ID = 'aliyun-captcha-button';
 const captchaScriptPromises = new Map<string, Promise<void>>();
@@ -239,11 +238,11 @@ export function PerformanceHomePage() {
   };
 
   const confirmRecord = async (record: EmployeePerformance) => {
-    const confirmSmsCode = await promptSmsCode(loginMobile);
-    if (!confirmSmsCode) {
+    const confirmed = await promptConfirm(record);
+    if (!confirmed) {
       return;
     }
-    await performanceApi.confirm(record.id, { smsCode: confirmSmsCode });
+    await performanceApi.confirm(record.id);
     Toast.show({ icon: 'success', content: '已确认' });
     await loadRecords();
   };
@@ -376,56 +375,19 @@ export function PerformanceHomePage() {
   );
 }
 
-async function promptSmsCode(mobile: string) {
-  let value = '';
+async function promptConfirm(record: EmployeePerformance) {
   const confirmed = await Dialog.confirm({
-    title: '请输入确认验证码',
-    content: <ConfirmSmsCodeInput mobile={mobile} onChange={(text) => { value = text; }} />,
+    title: '确认绩效',
+    content: (
+      <div className="confirm-sms-panel">
+        <div className="confirm-sms-mobile">确认后将提交当前绩效结果。</div>
+        <div className="record-score">绩效：{record.performance}</div>
+      </div>
+    ),
     confirmText: '确认',
     cancelText: '取消',
   });
-  return confirmed ? value : '';
-}
-
-interface ConfirmSmsCodeInputProps {
-  mobile: string;
-  onChange: (value: string) => void;
-}
-
-function ConfirmSmsCodeInput({ mobile, onChange }: ConfirmSmsCodeInputProps) {
-  const [sending, setSending] = useState(false);
-  const [countdown, setCountdown] = useState(0);
-
-  useEffect(() => {
-    if (countdown <= 0) {
-      return undefined;
-    }
-    const timer = window.setTimeout(() => setCountdown((value) => value - 1), 1000);
-    return () => window.clearTimeout(timer);
-  }, [countdown]);
-
-  const sendConfirmSms = async () => {
-    setSending(true);
-    try {
-      await performanceApi.sendSmsCode({ mobile, scene: CONFIRM_SCENE });
-      setCountdown(60);
-      Toast.show({ icon: 'success', content: '确认验证码已发送' });
-    } finally {
-      setSending(false);
-    }
-  };
-
-  return (
-    <div className="confirm-sms-panel">
-      <div className="confirm-sms-row">
-        <Input placeholder="请输入短信验证码" maxLength={6} onChange={onChange} />
-        <Button size="small" color="primary" loading={sending} disabled={countdown > 0} onClick={sendConfirmSms}>
-          {countdown > 0 ? `${countdown}s` : '获取验证码'}
-        </Button>
-      </div>
-      <div className="confirm-sms-mobile">发送至 {maskMobile(mobile)}</div>
-    </div>
-  );
+  return confirmed;
 }
 
 async function promptFeedback() {
@@ -485,13 +447,6 @@ function buttonClassName(disabled: boolean, loading: boolean) {
   ]
     .filter(Boolean)
     .join(' ');
-}
-
-function maskMobile(value: string) {
-  if (!/^1\d{10}$/.test(value)) {
-    return value || '-';
-  }
-  return `${value.slice(0, 3)}****${value.slice(7)}`;
 }
 
 function formatFeedbackStatusText(value: string) {

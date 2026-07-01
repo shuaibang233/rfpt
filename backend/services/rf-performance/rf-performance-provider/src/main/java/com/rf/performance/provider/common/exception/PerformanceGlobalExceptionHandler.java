@@ -3,6 +3,7 @@ package com.rf.performance.provider.common.exception;
 import com.zy.common.core.bo.Result;
 import com.zy.common.core.enums.ErrorCode;
 import com.zy.common.core.exception.BusinessException;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -23,11 +24,18 @@ public class PerformanceGlobalExceptionHandler {
      * 处理业务异常。
      *
      * @param exception 业务异常
+     * @param request HTTP 请求
      * @return 统一错误结果
      */
     @ExceptionHandler(BusinessException.class)
-    public Result<Void> handleBusinessException(BusinessException exception) {
-        log.warn("员工绩效业务异常，code={}, message={}", exception.getErrorCode().getCode(), exception.getMessage());
+    public Result<Void> handleBusinessException(BusinessException exception, HttpServletRequest request) {
+        if (ErrorCode.E999005.equals(exception.getErrorCode())) {
+            log.info("员工绩效未登录访问，method={}, path={}, message={}",
+                    request.getMethod(), request.getRequestURI(), exception.getMessage());
+            return Result.error(exception.getErrorCode(), exception.getMessage());
+        }
+        log.warn("员工绩效业务异常，method={}, path={}, code={}, message={}",
+                request.getMethod(), request.getRequestURI(), exception.getErrorCode().getCode(), exception.getMessage());
         return Result.error(exception.getErrorCode(), exception.getMessage());
     }
 

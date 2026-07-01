@@ -19,11 +19,6 @@ public class EmployeePerformanceConfirmCommand {
     private String mobile;
 
     /**
-     * 短信验证码。
-     */
-    private String smsCode;
-
-    /**
      * 请求 IP。
      */
     private String ipAddress;
