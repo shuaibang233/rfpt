@@ -529,10 +529,10 @@ function App() {
     },
     {
       title: '操作',
-      width: 230,
+      width: 320,
       fixed: 'right',
       render: (_, row) => (
-        <Space>
+        <Space className="table-action-group" wrap>
           <Button size="small" icon={<EyeOutlined />} disabled={!row.feedbackContent} onClick={() => openFeedback(row)}>反馈</Button>
           <Button size="small" icon={<EditOutlined />} disabled={!canAdjustPerformance(row)} onClick={() => openAdjust(row)}>调整</Button>
           <Button size="small" disabled={!canAdjustPerformance(row)} onClick={() => closeFeedbackUnchanged(row)}>无需调整</Button>
@@ -1187,7 +1187,7 @@ function App() {
                             columns={performanceColumns}
                             dataSource={performanceList}
                             size="small"
-                            scroll={{ x: 1330 }}
+                            scroll={{ x: 1450 }}
                             pagination={{
                               current: performanceRecordPage.page,
                               pageSize: performanceRecordPage.size,

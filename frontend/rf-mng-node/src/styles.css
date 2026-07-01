@@ -28,6 +28,7 @@ body { margin: 0; background: #f5f7fb; color: #1f2937; font-family: -apple-syste
 .query-bar { padding: 18px 16px; row-gap: 18px; column-gap: 24px; background: #f8fafc; border: 1px solid #eef2f7; border-radius: 8px; }
 .query-bar .ant-form-item { margin-inline-end: 0; margin-bottom: 0; }
 .toolbar-row { display: flex; align-items: center; justify-content: space-between; }
+.table-action-group { display: flex; flex-wrap: wrap; gap: 8px; }
 .table-action-group .ant-btn { border-radius: 6px; }
 .performance-task-table .ant-table-body { padding-bottom: 10px; }
 .performance-task-table .ant-table-tbody > tr > td { padding-top: 12px !important; padding-bottom: 12px !important; }
